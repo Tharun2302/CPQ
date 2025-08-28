@@ -63,6 +63,63 @@ function App() {
     company: ''
   });
 
+  // Function to get deal information from URL parameters or localStorage
+  const getDealInfo = () => {
+    const dealInfo = localStorage.getItem('dealInfo');
+    if (dealInfo) {
+      try {
+        return JSON.parse(dealInfo);
+      } catch (error) {
+        console.error('Error parsing deal info:', error);
+        return null;
+      }
+    }
+    return null;
+  };
+
+  // Function to clear deal information
+  const clearDealInfo = () => {
+    localStorage.removeItem('dealInfo');
+    console.log('🗑️ Deal information cleared');
+  };
+
+  // Function to update deal information
+  const updateDealInfo = (dealData: { dealId?: string; dealName?: string; amount?: number }) => {
+    const currentDealInfo = getDealInfo() || {};
+    const updatedDealInfo = { ...currentDealInfo, ...dealData };
+    localStorage.setItem('dealInfo', JSON.stringify(updatedDealInfo));
+    console.log('📝 Deal information updated:', updatedDealInfo);
+  };
+
+  // Function to debug and display current deal information
+  const debugDealInfo = () => {
+    const dealInfo = getDealInfo();
+    console.log('🔍 Current Deal Information:');
+    if (dealInfo) {
+      console.log('   Deal ID:', dealInfo.dealId);
+      console.log('   Deal Name:', dealInfo.dealName);
+      console.log('   Amount:', dealInfo.amount);
+    } else {
+      console.log('   No deal information found');
+    }
+    return dealInfo;
+  };
+
+  // Make deal functions available globally for debugging
+  useEffect(() => {
+    (window as any).dealFunctions = {
+      getDealInfo,
+      updateDealInfo,
+      clearDealInfo,
+      debugDealInfo
+    };
+    console.log('🔧 Deal functions available in console:');
+    console.log('   window.dealFunctions.getDealInfo()');
+    console.log('   window.dealFunctions.updateDealInfo({dealId: "123", dealName: "Test Deal"})');
+    console.log('   window.dealFunctions.clearDealInfo()');
+    console.log('   window.dealFunctions.debugDealInfo()');
+  }, []);
+
   // Function to get current quote data for template processing
   const getCurrentQuoteData = () => {
     if (!configuration || !selectedTier) {
@@ -97,6 +154,39 @@ function App() {
   useEffect(() => {
     // Clear old pricing cache and force use of new pricing tiers
     localStorage.removeItem('pricingTiers');
+    
+    // Fetch URL parameters for deal information
+    const urlParams = new URLSearchParams(window.location.search);
+    const dealId = urlParams.get('dealId');
+    const dealName = urlParams.get('dealName');
+    const amount = urlParams.get('amount');
+    
+    // Log the fetched parameters
+    if (dealId || dealName || amount) {
+      console.log('🔍 URL Parameters detected:');
+      console.log('   Deal ID:', dealId);
+      console.log('   Deal Name:', dealName);
+      console.log('   Amount:', amount);
+      
+      // You can use these values to pre-populate forms or set state
+      // For example, if you want to set the current client info based on deal data
+      if (dealName) {
+        setCurrentClientInfo(prev => ({
+          ...prev,
+          clientName: dealName,
+          company: dealName.split(' ')[0] + ' Inc.' // Extract company name from deal name
+        }));
+      }
+      
+      // Store deal information in localStorage for later use
+      if (dealId || dealName || amount) {
+        localStorage.setItem('dealInfo', JSON.stringify({
+          dealId,
+          dealName,
+          amount: amount ? parseFloat(amount) : null
+        }));
+      }
+    }
 
     localStorage.removeItem('pricingTierConfigurations');
     
