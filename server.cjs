@@ -37,6 +37,20 @@ const pool = mysql.createPool(dbConfig);
 // Initialize database tables
 async function initializeDatabase() {
   try {
+    // Check if database connection is available
+    console.log('🔍 Checking database connection...');
+    console.log('📊 Database config:', {
+      host: dbConfig.host,
+      user: dbConfig.user,
+      database: dbConfig.database,
+      port: dbConfig.port
+    });
+    
+    // Test connection first
+    const connection = await pool.getConnection();
+    console.log('✅ Database connection successful');
+    connection.release();
+    
     // Create signature_forms table if it doesn't exist
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS signature_forms (
@@ -61,18 +75,43 @@ async function initializeDatabase() {
     `);
     
     console.log('✅ Database tables initialized successfully');
+    return true;
   } catch (error) {
-    console.error('❌ Error initializing database:', error);
+    console.error('❌ Error initializing database:', error.message);
+    console.log('⚠️ Database features will be disabled');
+    console.log('📝 To enable database features, set up a MySQL database and configure:');
+    console.log('   DB_HOST, DB_USER, DB_PASSWORD, DB_NAME environment variables');
+    return false;
   }
 }
 
-// Initialize database on startup
-initializeDatabase();
+// Initialize database on startup (non-blocking)
+let databaseAvailable = false;
+initializeDatabase().then(available => {
+  databaseAvailable = available;
+  if (available) {
+    console.log('✅ Database is available and ready');
+  } else {
+    console.log('⚠️ Running without database - some features will be limited');
+  }
+}).catch(error => {
+  console.error('❌ Database initialization failed:', error.message);
+  databaseAvailable = false;
+});
 
 // Test endpoint to check database and forms
 app.get('/api/signature/debug', async (req, res) => {
   try {
     console.log('🔍 Debug endpoint called');
+    
+    if (!databaseAvailable) {
+      return res.json({
+        success: false,
+        error: 'Database not available',
+        message: 'Database connection failed. Some features will be limited.',
+        databaseAvailable: false
+      });
+    }
     
     // Check if table exists
     const [tableCheck] = await pool.execute('SHOW TABLES LIKE "signature_forms"');
@@ -96,21 +135,48 @@ app.get('/api/signature/debug', async (req, res) => {
           createdAt: f.created_at,
           status: f.status
         }))
-      }
+      },
+      databaseAvailable: true
     });
   } catch (error) {
     console.error('❌ Debug endpoint error:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
+      databaseAvailable: false
     });
   }
+});
+
+// Health check endpoint (doesn't require database)
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'Server is running',
+    timestamp: new Date().toISOString(),
+    databaseAvailable: databaseAvailable,
+    features: {
+      hubspot: true,
+      email: true,
+      pdf: true,
+      database: databaseAvailable
+    }
+  });
 });
 
 // Test endpoint to create a sample form
 app.post('/api/signature/test-create', async (req, res) => {
   try {
     console.log('🧪 Creating test signature form...');
+    
+    if (!databaseAvailable) {
+      return res.json({
+        success: false,
+        error: 'Database not available',
+        message: 'Cannot create signature forms without database connection',
+        databaseAvailable: false
+      });
+    }
     
     const formId = `test-form-${Date.now()}`;
     const testData = {
