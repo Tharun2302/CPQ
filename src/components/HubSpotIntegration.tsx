@@ -225,7 +225,8 @@ const HubSpotIntegration: React.FC<HubSpotIntegrationProps> = ({
       // Try backend server first
       try {
         console.log('🔄 Fetching contacts from backend server...');
-        response = await fetch('http://localhost:3001/api/hubspot/contacts', {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+        response = await fetch(`${backendUrl}/api/hubspot/contacts`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -325,7 +326,8 @@ const HubSpotIntegration: React.FC<HubSpotIntegrationProps> = ({
       // Try backend server first
       try {
         console.log('🔄 Fetching deals from backend server...');
-        response = await fetch('http://localhost:3001/api/hubspot/deals', {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+        response = await fetch(`${backendUrl}/api/hubspot/deals`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -449,9 +451,10 @@ const HubSpotIntegration: React.FC<HubSpotIntegrationProps> = ({
     
     try {
       console.log('🔍 Testing HubSpot connection via backend server...');
-      console.log('🌐 Backend URL: http://localhost:3001/api/hubspot/test');
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      console.log('🌐 Backend URL: ${backendUrl}/api/hubspot/test');
       
-      const backendResponse = await fetch('http://localhost:3001/api/hubspot/test', {
+      const backendResponse = await fetch(`${backendUrl}/api/hubspot/test`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -533,7 +536,8 @@ const HubSpotIntegration: React.FC<HubSpotIntegrationProps> = ({
     
     try {
       // Check if backend server is available
-      const backendHealth = await fetch('http://localhost:3001/api/health', {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const backendHealth = await fetch(`${backendUrl}/api/health`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -613,7 +617,8 @@ const HubSpotIntegration: React.FC<HubSpotIntegrationProps> = ({
       // Try backend server first
       try {
         console.log('🔄 Trying backend server for contact creation...');
-        response = await fetch('http://localhost:3001/api/hubspot/contacts', {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+        response = await fetch(`${backendUrl}/api/hubspot/contacts`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -710,7 +715,8 @@ const HubSpotIntegration: React.FC<HubSpotIntegrationProps> = ({
       // Try backend server first
       try {
         console.log('🔄 Trying backend server for deal creation...');
-        response = await fetch('http://localhost:3001/api/hubspot/deals', {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+        response = await fetch(`${backendUrl}/api/hubspot/deals`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
