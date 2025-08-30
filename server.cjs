@@ -761,6 +761,72 @@ app.get('/api/hubspot/deals', async (req, res) => {
   }
 });
 
+// Get specific HubSpot deal by ID
+app.get('/api/hubspot/deal/:dealId', async (req, res) => {
+  try {
+    const { dealId } = req.params;
+    console.log('🔍 Fetching specific HubSpot deal:', dealId);
+    
+    if (HUBSPOT_API_KEY === 'demo-key') {
+      console.log('⚠️ Using demo data for specific deal');
+      return res.json({
+        success: true,
+        data: {
+          id: dealId,
+          properties: {
+            dealname: 'Demo Deal',
+            amount: '50000',
+            dealstage: 'closedwon',
+            closedate: '2024-08-15T00:00:00Z',
+            hubspot_owner_id: 'demo-owner-123'
+          }
+        },
+        isDemo: true
+      });
+    }
+
+    const response = await axios.get(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/${dealId}`, {
+      headers: {
+        'Authorization': `Bearer ${HUBSPOT_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      params: {
+        properties: 'dealname,amount,dealstage,closedate,hubspot_owner_id'
+      }
+    });
+
+    console.log('✅ Specific HubSpot deal fetched successfully');
+    res.json({
+      success: true,
+      data: response.data,
+      isDemo: false
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching specific HubSpot deal:', error.response?.data || error.message);
+    
+    if (error.response?.status === 404) {
+      res.status(404).json({
+        success: false,
+        message: 'Deal not found',
+        error: 'DEAL_NOT_FOUND'
+      });
+    } else if (error.response?.status === 401) {
+      res.status(401).json({
+        success: false,
+        message: 'HubSpot API authentication failed',
+        error: 'AUTHENTICATION_ERROR'
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch specific deal',
+        error: error.response?.data || error.message
+      });
+    }
+  }
+});
+
 // Create HubSpot contact
 app.post('/api/hubspot/contacts', async (req, res) => {
   try {

@@ -94,6 +94,7 @@ const HubSpotIntegration: React.FC<HubSpotIntegrationProps> = ({
     isLoadingContacts: false,
     isLoadingDeals: false,
     selectedContact: null as HubSpotContact | null,
+    selectedDeal: null as HubSpotDeal | null,
     searchTerm: ''
   });
 
@@ -1220,6 +1221,7 @@ const HubSpotIntegration: React.FC<HubSpotIntegrationProps> = ({
               <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                 <Building className="w-5 h-5" />
                 Deals ({state.hubspotDeals.length})
+                <span className="text-xs text-gray-500 font-normal">(Click to preview)</span>
               </h4>
               <button
                 onClick={fetchHubSpotDeals}
@@ -1245,9 +1247,13 @@ const HubSpotIntegration: React.FC<HubSpotIntegrationProps> = ({
                   .map(deal => (
                     <div
                       key={deal.id}
-                      className="p-4 border border-gray-200 rounded-lg hover:border-orange-300 hover:shadow-md transition-all"
+                      className="p-4 border border-gray-200 rounded-lg hover:border-orange-300 hover:shadow-md transition-all cursor-pointer relative group"
+                      onClick={() => updateState({ selectedDeal: deal })}
                     >
-                      <h5 className="font-semibold text-gray-800 mb-2">
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Eye className="w-4 h-4 text-gray-400" />
+                      </div>
+                      <h5 className="font-semibold text-gray-800 mb-2 pr-6">
                         {deal.properties.dealname}
                       </h5>
                       <div className="space-y-1 text-sm text-gray-600">
@@ -1335,6 +1341,101 @@ const HubSpotIntegration: React.FC<HubSpotIntegrationProps> = ({
                       new Date(state.selectedContact.properties.lastmodifieddate).toLocaleDateString() : 'N/A'}
                   </span>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deal Detail Modal */}
+      {state.selectedDeal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Deal Details</h3>
+              <button
+                onClick={() => updateState({ selectedDeal: null })}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
+                  <Building className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-800">
+                    {state.selectedDeal.properties.dealname}
+                  </h4>
+                  <p className="text-sm text-gray-600">Deal ID: {state.selectedDeal.id}</p>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm text-gray-600">Amount:</span>
+                  <span className="font-semibold text-gray-800">
+                    ${state.selectedDeal.properties.amount ? parseInt(state.selectedDeal.properties.amount).toLocaleString() : '0'}
+                  </span>
+                </div>
+                
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm text-gray-600">Stage:</span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    state.selectedDeal.properties.dealstage === 'closedwon' ? 'bg-green-100 text-green-700' :
+                    state.selectedDeal.properties.dealstage === 'closedlost' ? 'bg-red-100 text-red-700' :
+                    'bg-blue-100 text-blue-700'
+                  }`}>
+                    {state.selectedDeal.properties.dealstage ? 
+                      state.selectedDeal.properties.dealstage.replace(/([A-Z])/g, ' $1').toLowerCase() : 'Unknown'}
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <span className="text-gray-700">
+                    Close Date: {state.selectedDeal.properties.closedate ? 
+                      new Date(state.selectedDeal.properties.closedate).toLocaleDateString() : 'N/A'}
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <span className="text-gray-700">
+                    Created: {state.selectedDeal.properties.createdate ? 
+                      new Date(state.selectedDeal.properties.createdate).toLocaleDateString() : 'N/A'}
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <span className="text-gray-700">
+                    Modified: {state.selectedDeal.properties.lastmodifieddate ? 
+                      new Date(state.selectedDeal.properties.lastmodifieddate).toLocaleDateString() : 'N/A'}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex gap-2 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => {
+                    // You can add functionality to use this deal for quote generation
+                    console.log('Using deal for quote:', state.selectedDeal);
+                    updateState({ selectedDeal: null });
+                  }}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Use for Quote
+                </button>
+                <button
+                  onClick={() => updateState({ selectedDeal: null })}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>

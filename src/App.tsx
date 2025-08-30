@@ -8,13 +8,15 @@ import HubSpotIntegration from './components/HubSpotIntegration';
 import QuoteGenerator from './components/QuoteGenerator';
 import QuoteManager from './components/QuoteManager';
 import TemplateManager from './components/TemplateManager';
+import DealDetails from './components/DealDetails';
+import DealComponents from './components/DealComponents';
 
 import Analytics from './components/Analytics';
 import Settings from './components/Settings';
 import DigitalSignatureForm from './components/DigitalSignatureForm';
 import { ConfigurationData, PricingCalculation, PricingTier, PricingTierConfiguration, Quote } from './types/pricing';
 import { calculateAllTiers, getRecommendedTier, PRICING_TIERS } from './utils/pricing';
-import { FileText } from 'lucide-react';
+import { FileText, Building } from 'lucide-react';
 
 function App() {
   const [activeTab, setActiveTab] = useState('configure');
@@ -63,6 +65,9 @@ function App() {
     company: ''
   });
 
+  // Deal data state
+  const [dealData, setDealData] = useState<any>(null);
+
   // Function to get deal information from URL parameters or localStorage
   const getDealInfo = () => {
     const dealInfo = localStorage.getItem('dealInfo');
@@ -104,6 +109,70 @@ function App() {
     }
     return dealInfo;
   };
+
+  // Parse deal parameters from URL
+  const parseDealParameters = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const dealId = urlParams.get('dealId');
+    const dealName = urlParams.get('dealName');
+    const amount = urlParams.get('amount');
+    const closeDate = urlParams.get('closeDate');
+    const stage = urlParams.get('stage');
+    const ownerId = urlParams.get('ownerId');
+    
+    if (dealId) {
+      const dealData = {
+        dealId,
+        dealName: dealName || 'Unnamed Deal',
+        amount: amount || '$0',
+        closeDate: closeDate || '',
+        stage: stage || 'Not Set',
+        ownerId: ownerId || 'Not Set'
+      };
+      
+      setDealData(dealData);
+      return dealData;
+    }
+    return null;
+  };
+
+  // Refresh deal data from HubSpot
+  const refreshDealData = async () => {
+    if (dealData?.dealId) {
+      try {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+        const response = await fetch(`${backendUrl}/api/hubspot/deal/${dealData.dealId}`);
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            setDealData(result.data);
+          }
+        }
+      } catch (error) {
+        console.error('Error refreshing deal data:', error);
+      }
+    }
+  };
+
+  // Handle URL parameters on component mount
+  useEffect(() => {
+    const dealParams = parseDealParameters();
+    
+    if (dealParams) {
+      // Auto-populate the configuration form with deal data
+      setConfiguration(prev => ({
+        ...prev,
+        clientName: dealParams.dealName,
+        // You can add more auto-population here
+      }));
+      
+      // Store deal info for later use
+      localStorage.setItem('dealInfo', JSON.stringify(dealParams));
+      
+      // Set active tab to 'deal' when deal data is present
+      setActiveTab('deal');
+    }
+  }, []);
 
   // Make deal functions available globally for debugging
   useEffect(() => {
@@ -615,6 +684,163 @@ function App() {
     }
 
     switch (activeTab) {
+      case 'deal':
+        return (
+          <div className="max-w-7xl mx-auto p-6">
+            {/* Simple test to verify the tab is working */}
+            <div className="bg-blue-100 border border-blue-300 rounded-lg p-4 mb-6">
+              <h1 className="text-2xl font-bold text-blue-900 mb-2">Deal Tab is Working!</h1>
+              <p className="text-blue-700">If you can see this, the Deal tab is functioning correctly.</p>
+            </div>
+            
+            <div className="mb-8">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900 mb-2">Deal Information</h1>
+                  <p className="text-gray-600">View and manage deal details from HubSpot</p>
+                </div>
+                {dealData && (
+                  <div className="flex items-center space-x-3">
+                    <button 
+                      onClick={refreshDealData}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Refresh Data
+                    </button>
+                    <a
+                      href={`https://app.hubspot.com/contacts/_/deal/${dealData.dealId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      View in HubSpot
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Always show test components */}
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Individual Deal Components</h2>
+              
+              {/* Simple test components first */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="flex items-center p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-sm">
+                  <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center mr-4">
+                    <span className="text-white font-bold">#</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-500 font-medium mb-1">Deal ID</p>
+                    <p className="font-bold text-gray-900 text-xl">TEST-12345</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center p-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200 shadow-sm">
+                  <div className="w-12 h-12 bg-indigo-500 rounded-lg flex items-center justify-center mr-4">
+                    <span className="text-white font-bold">📄</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-500 font-medium mb-1">Deal Name</p>
+                    <p className="font-bold text-gray-900 text-xl">Test Deal - Cloud Migration</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200 shadow-sm">
+                  <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center mr-4">
+                    <span className="text-white font-bold">$</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-500 font-medium mb-1">Deal Amount</p>
+                    <p className="font-bold text-gray-900 text-xl">$25,000</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center p-6 bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl border border-purple-200 shadow-sm">
+                  <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center mr-4">
+                    <span className="text-white font-bold">🎯</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-500 font-medium mb-1">Deal Stage</p>
+                    <p className="font-bold text-gray-900 text-xl">Proposal</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center p-6 bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl border border-orange-200 shadow-sm">
+                  <div className="w-12 h-12 bg-orange-500 rounded-lg flex items-center justify-center mr-4">
+                    <span className="text-white font-bold">📅</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-500 font-medium mb-1">Close Date</p>
+                    <p className="font-bold text-gray-900 text-xl">12/31/2024</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center p-6 bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl border border-teal-200 shadow-sm">
+                  <div className="w-12 h-12 bg-teal-500 rounded-lg flex items-center justify-center mr-4">
+                    <span className="text-white font-bold">👤</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-500 font-medium mb-1">Owner ID</p>
+                    <p className="font-bold text-gray-900 text-xl">user-456</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Try the actual DealComponents */}
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-4">DealComponents Test</h3>
+                <DealComponents dealData={{
+                  dealId: "TEST-12345",
+                  dealName: "Test Deal - Cloud Migration Project",
+                  amount: "$25,000",
+                  stage: "Proposal",
+                  closeDate: "2024-12-31",
+                  ownerId: "user-456"
+                }} />
+              </div>
+            </div>
+            
+            {/* Show real deal data if available */}
+            {dealData && (
+              <div className="mt-8">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Real Deal Data</h2>
+                <DealComponents dealData={dealData} />
+              </div>
+            )}
+            
+            {/* Show message if no real deal data */}
+            {!dealData && (
+              <div className="bg-white rounded-lg shadow-md p-8 text-center">
+                <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h2 className="text-xl font-semibold text-gray-800 mb-2">No Real Deal Information</h2>
+                <p className="text-gray-600 mb-4">
+                  Real deal details will appear here when accessed from HubSpot
+                </p>
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-500">
+                    To view real deal information, click on the CPQ tool button in HubSpot
+                  </p>
+                  <div className="flex justify-center space-x-4">
+                    <button 
+                      onClick={() => setActiveTab('hubspot')}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    >
+                      Go to HubSpot Integration
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('configure')}
+                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                    >
+                      Start Configuration
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
       case 'configure':
         return (
           <div className="space-y-8">
