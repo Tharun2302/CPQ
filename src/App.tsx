@@ -121,16 +121,26 @@ function App() {
     const stage = urlParams.get('stage');
     const ownerId = urlParams.get('ownerId');
     
+    console.log('🔍 Parsing URL parameters:', {
+      dealId,
+      dealName,
+      amount,
+      closeDate,
+      stage,
+      ownerId
+    });
+    
     if (dealId) {
       const dealData = {
         dealId,
         dealName: dealName || 'Unnamed Deal',
-        amount: amount || '$0',
+        amount: amount || 'Not Set',
         closeDate: closeDate || '',
         stage: stage || 'Not Set',
         ownerId: ownerId || 'Not Set'
       };
       
+      console.log('📋 Created deal data:', dealData);
       setDealData(dealData);
       return dealData;
     }
@@ -141,17 +151,55 @@ function App() {
   const refreshDealData = async () => {
     if (dealData?.dealId) {
       try {
+        console.log('🔄 Refreshing deal data for ID:', dealData.dealId);
         const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
         const response = await fetch(`${backendUrl}/api/hubspot/deal/${dealData.dealId}`);
+        
         if (response.ok) {
           const result = await response.json();
-          if (result.success) {
-            setDealData(result.data);
+          console.log('📥 HubSpot API response:', result);
+          
+          if (result.success && result.data) {
+            // Extract properties from HubSpot response
+            const properties = result.data.properties || result.data;
+            
+            // Create updated deal data with proper field mapping
+            const updatedDealData = {
+              dealId: dealData.dealId,
+              dealName: properties.dealname || properties.dealName || dealData.dealName || 'Not Set',
+              amount: properties.amount || dealData.amount || 'Not Set',
+              stage: properties.dealstage || properties.stage || dealData.stage || 'Not Set',
+              closeDate: properties.closedate || properties.closeDate || dealData.closeDate || '',
+              ownerId: properties.hubspot_owner_id || properties.ownerId || dealData.ownerId || 'Not Set',
+              company: properties.company || dealData.company || '',
+              contactName: properties.contact_name || properties.contactName || dealData.contactName || '',
+              contactEmail: properties.contact_email || properties.contactEmail || dealData.contactEmail || ''
+            };
+            
+            console.log('✅ Updated deal data:', updatedDealData);
+            
+            // Update both dealData and activeDealData if they match
+            setDealData(updatedDealData);
+            if (activeDealData && activeDealData.dealId === dealData.dealId) {
+              setActiveDealData(updatedDealData);
+            }
+            
+            // Update localStorage
+            localStorage.setItem('dealInfo', JSON.stringify(updatedDealData));
+            
+            // Show success message
+            console.log('🎉 Deal data refreshed successfully from HubSpot!');
+          } else {
+            console.warn('⚠️ HubSpot API returned no data for deal:', dealData.dealId);
           }
+        } else {
+          console.error('❌ HubSpot API error:', response.status, response.statusText);
         }
       } catch (error) {
-        console.error('Error refreshing deal data:', error);
+        console.error('❌ Error refreshing deal data:', error);
       }
+    } else {
+      console.warn('⚠️ No deal ID available for refresh');
     }
   };
 
@@ -179,6 +227,12 @@ function App() {
       
       // Set active tab to 'deal' when deal data is present
       setActiveTab('deal');
+      
+      // Automatically refresh deal data from HubSpot to get real values
+      console.log('🚀 Auto-refreshing deal data from HubSpot...');
+      setTimeout(() => {
+        refreshDealData();
+      }, 1000); // Small delay to ensure component is fully mounted
     }
   }, []);
 

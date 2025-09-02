@@ -34,6 +34,7 @@ interface DealDetailsProps {
 
 const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh, onUseDealData }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   console.log('🔍 DealDetails render - dealData:', dealData);
 
@@ -59,9 +60,22 @@ const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh, onUseDea
 
   const handleRefresh = async () => {
     if (onRefresh) {
+      console.log('🔄 Refresh button clicked - starting refresh...');
       setIsLoading(true);
-      await onRefresh();
-      setIsLoading(false);
+      try {
+        await onRefresh();
+        console.log('✅ Refresh completed successfully');
+        
+        // Show success message
+        setShowSuccessMessage(true);
+        setTimeout(() => setShowSuccessMessage(false), 3000); // Hide after 3 seconds
+      } catch (error) {
+        console.error('❌ Error during refresh:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      console.warn('⚠️ No refresh function provided');
     }
   };
 
@@ -73,6 +87,14 @@ const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh, onUseDea
 
   return (
     <div className="bg-gradient-to-br from-white to-blue-50/30 rounded-xl shadow-lg border border-blue-100 p-8">
+      {showSuccessMessage && (
+        <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded-lg">
+          <p className="text-sm text-green-800 flex items-center gap-2">
+            <CheckCircle className="w-4 h-4" />
+            Deal data refreshed successfully from HubSpot!
+          </p>
+        </div>
+      )}
       <div className="mb-4 p-2 bg-yellow-100 border border-yellow-300 rounded">
         <p className="text-sm text-yellow-800">Debug: DealDetails component is rendering</p>
       </div>

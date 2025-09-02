@@ -774,11 +774,14 @@ app.get('/api/hubspot/deal/:dealId', async (req, res) => {
         data: {
           id: dealId,
           properties: {
-            dealname: 'Demo Deal',
-            amount: '50000',
-            dealstage: 'closedwon',
-            closedate: '2024-08-15T00:00:00Z',
-            hubspot_owner_id: 'demo-owner-123'
+            dealname: 'Demo Deal - Cloud Migration',
+            amount: '25000',
+            dealstage: 'proposal',
+            closedate: '2024-12-31T00:00:00Z',
+            hubspot_owner_id: 'demo-owner-123',
+            company: 'Demo Company',
+            contact_name: 'Demo Contact',
+            contact_email: 'demo@company.com'
           }
         },
         isDemo: true
@@ -791,7 +794,7 @@ app.get('/api/hubspot/deal/:dealId', async (req, res) => {
         'Content-Type': 'application/json'
       },
       params: {
-        properties: 'dealname,amount,dealstage,closedate,hubspot_owner_id'
+        properties: 'dealname,amount,dealstage,closedate,hubspot_owner_id,company,contact_name,contact_email'
       }
     });
 
