@@ -34,9 +34,8 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                Configure • Price • Quote
+                CPQ
               </h1>
-              <p className="text-sm bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent font-medium">CPQ Pro</p>
             </div>
           </div>
 

@@ -198,12 +198,6 @@ const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh, onUseDea
               Use Deal Data
               <ArrowRight className="w-4 h-4 ml-2" />
             </button>
-            <button className="px-6 py-3 text-sm bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow-lg">
-              Create Quote
-            </button>
-            <button className="px-6 py-3 text-sm border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200">
-              Export Details
-            </button>
           </div>
         </div>
       </div>

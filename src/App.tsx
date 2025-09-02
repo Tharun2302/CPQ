@@ -574,7 +574,8 @@ function App() {
         id: 'default',
         name: 'Default Template',
         isDefault: true
-      }
+      },
+      dealData: activeDealData || null
     };
 
     // Add quote to state (localStorage)
@@ -595,7 +596,8 @@ function App() {
           configuration: newQuote.configuration,
           selectedTier: newQuote.selectedTier,
           calculation: newQuote.calculation,
-          status: newQuote.status
+          status: newQuote.status,
+          dealData: newQuote.dealData
         })
       });
 

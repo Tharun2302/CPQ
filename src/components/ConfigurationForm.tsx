@@ -187,29 +187,7 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({ onConfigurationCh
             )}
           </div>
           
-          {/* Suggested Configuration Section */}
-          {suggestedConfig && (
-            <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="w-4 h-4 text-blue-600" />
-                <h4 className="text-sm font-semibold text-gray-800">Suggested Configuration</h4>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500">Users:</span>
-                  <span className="font-medium text-gray-900">{suggestedConfig.numberOfUsers}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500">Data Size:</span>
-                  <span className="font-medium text-gray-900">{suggestedConfig.dataSizeGB} GB</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500">Duration:</span>
-                  <span className="font-medium text-gray-900">{suggestedConfig.duration} months</span>
-                </div>
-              </div>
-            </div>
-          )}
+
         </div>
       )}
 

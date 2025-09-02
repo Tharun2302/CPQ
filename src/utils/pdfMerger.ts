@@ -1655,7 +1655,14 @@ export const createTemplatePreviewHTML = async (
       '{{client_name}}': quote.clientName,
       '{{client_email}}': quote.clientEmail,
       '{{quote_number}}': quoteNumber,
-      '{{date}}': currentDate
+      '{{date}}': currentDate,
+      
+      // Deal information placeholders
+      '{{deal_id}}': quote.dealData?.dealId || '',
+      '{{deal_name}}': quote.dealData?.dealName || '',
+      '{{deal_amount}}': quote.dealData?.amount || '',
+      '{{deal_stage}}': quote.dealData?.stage || '',
+      '{{deal_owner_id}}': quote.dealData?.ownerId || ''
     };
 
     // Function to replace placeholders in text
@@ -1669,59 +1676,86 @@ export const createTemplatePreviewHTML = async (
 
     // Create the merged quote content that would appear on the first page of the template
     const mergedContent = `
-      <div class="template-preview bg-white border-2 border-gray-200 rounded-xl p-8 shadow-lg" style="min-height: 800px; position: relative;">
+      <div class="template-preview bg-white border-2 border-gray-200 rounded-xl p-12 shadow-lg" style="min-height: 1000px; position: relative; font-size: 16px; line-height: 1.6;">
         <!-- Template Background Simulation -->
         <div class="absolute inset-0 bg-gradient-to-br from-gray-50 to-white opacity-50 rounded-xl"></div>
         
         <!-- Quote Content (This replaces the first page content) -->
-        <div class="relative z-10 space-y-6">
+        <div class="relative z-10 space-y-8">
 
 
           
           <!-- Agreement Title with Placeholders -->
-          <div class="text-center mb-6">
-            <h2 class="text-2xl font-bold text-blue-600">${replacePlaceholders('CloudFuze Purchase Agreement for {{Company Name}}.')}</h2>
+          <div class="text-center mb-8">
+            <h2 class="text-4xl font-bold text-blue-600 mb-4">${replacePlaceholders('CloudFuze Purchase Agreement for {{Company Name}}')}</h2>
+            <p class="text-lg text-gray-600">Professional Cloud Migration Services</p>
           </div>
           
           <!-- Introduction with Placeholders -->
-          <div class="mb-6">
-            <p class="text-sm text-gray-700">${replacePlaceholders('This agreement provides {{Company Name}}.with pricing for use of the CloudFuze\'s X-Change Enterprise Data')}</p>
+          <div class="mb-8">
+            <p class="text-base text-gray-700 leading-relaxed">${replacePlaceholders('This agreement provides {{Company Name}} with comprehensive pricing for the use of CloudFuze\'s X-Change Enterprise Data Migration platform and managed services.')}</p>
           </div>
           
           <!-- Service Offering Bar -->
-          <div class="mb-6">
-            <div class="bg-blue-100 text-blue-800 px-4 py-2 rounded text-sm font-medium">
-              Cloud-Hosted SaaS Solution | Managed Migration | Dedicated Migration Manager
+          <div class="mb-8">
+            <div class="bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 px-6 py-4 rounded-lg text-base font-semibold text-center border border-blue-200">
+              🚀 Cloud-Hosted SaaS Solution | 🔧 Managed Migration | 👥 Dedicated Migration Manager
             </div>
           </div>
 
           <!-- Client and Company Information -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-            <div class="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-8 rounded-xl border-2 border-blue-200 shadow-lg">
+              <h3 class="font-bold text-gray-800 mb-6 flex items-center gap-3 text-xl">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                 </svg>
                 Bill To:
               </h3>
-              <p class="font-semibold text-lg mb-1">${quote.clientName}</p>
-              <p class="text-gray-600 mb-1">${quote.company}</p>
-              <p class="text-gray-600">${quote.clientEmail}</p>
+              <p class="font-bold text-xl mb-2 text-gray-900">${quote.clientName}</p>
+              <p class="text-gray-700 mb-2 text-lg">${quote.company}</p>
+              <p class="text-gray-600 text-base">${quote.clientEmail}</p>
             </div>
             
-            <div class="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="bg-gradient-to-br from-green-50 to-emerald-50 p-8 rounded-xl border-2 border-green-200 shadow-lg">
+              <h3 class="font-bold text-gray-800 mb-6 flex items-center gap-3 text-xl">
+                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                 </svg>
                 From:
               </h3>
-              <p class="font-semibold text-lg mb-1">CPQ Pro Solutions</p>
-              <p class="text-gray-600 mb-1">123 Business Street</p>
-              <p class="text-gray-600 mb-1">City, State 12345</p>
-              <p class="text-gray-600">contact@cpqsolutions.com</p>
+              <p class="font-bold text-xl mb-2 text-gray-900">CPQ Pro Solutions</p>
+              <p class="text-gray-700 mb-2 text-lg">123 Business Street</p>
+              <p class="text-gray-700 mb-2 text-lg">City, State 12345</p>
+              <p class="text-gray-600 text-base">contact@cpqsolutions.com</p>
             </div>
           </div>
+
+          <!-- Deal Information -->
+          ${quote.dealData ? `
+          <div class="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg border border-purple-200 mb-8">
+            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+              </svg>
+              Deal Information
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              ${quote.dealData.dealId ? `
+              <div class="bg-white p-4 rounded-lg border border-purple-200">
+                <span class="text-gray-600 text-sm font-medium">Deal ID:</span>
+                <p class="font-semibold text-lg text-gray-900">${quote.dealData.dealId}</p>
+              </div>
+              ` : ''}
+              ${quote.dealData.dealName ? `
+              <div class="bg-white p-4 rounded-lg border border-purple-200">
+                <span class="text-gray-600 text-sm font-medium">Deal Name:</span>
+                <p class="font-semibold text-lg text-gray-900">${quote.dealData.dealName}</p>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+          ` : ''}
 
           <!-- Project Summary -->
           <div class="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border border-blue-200 mb-8">

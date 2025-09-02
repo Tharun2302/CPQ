@@ -482,6 +482,7 @@ const QuoteManager: React.FC<QuoteManagerProps> = ({
   const handlePreviewQuote = async (quote: Quote) => {
     console.log('🔍 Preview button clicked for quote:', quote.id);
     console.log('📋 Quote data:', quote);
+    console.log('🔍 Quote dealData:', quote.dealData);
     
     setSelectedQuote(quote);
     setIsLoadingTemplatePreview(true);
@@ -523,6 +524,14 @@ const QuoteManager: React.FC<QuoteManagerProps> = ({
               <p><strong>Email:</strong> ${quote.clientEmail}</p>
             </div>
             
+                         ${quote.dealData ? `
+             <div class="bg-purple-50 p-4 rounded-lg">
+               <h3 class="font-bold text-gray-800 mb-2">Deal Information</h3>
+               ${quote.dealData.dealId ? `<p><strong>Deal ID:</strong> ${quote.dealData.dealId}</p>` : ''}
+               ${quote.dealData.dealName ? `<p><strong>Deal Name:</strong> ${quote.dealData.dealName}</p>` : ''}
+             </div>
+             ` : ''}
+            
             <div class="bg-green-50 p-4 rounded-lg">
               <h3 class="font-bold text-gray-800 mb-2">Project Details</h3>
               <p><strong>Plan:</strong> ${quote.selectedTier.name}</p>
@@ -531,7 +540,7 @@ const QuoteManager: React.FC<QuoteManagerProps> = ({
               <p><strong>Duration:</strong> ${quote.configuration.duration} months</p>
             </div>
             
-            <div class="bg-purple-50 p-4 rounded-lg">
+            <div class="bg-orange-50 p-4 rounded-lg">
               <h3 class="font-bold text-gray-800 mb-2">Cost Summary</h3>
               <p><strong>Total Cost:</strong> $${quote.calculation.totalCost}</p>
             </div>
@@ -1226,7 +1235,7 @@ The client will receive an email with the PDF quote and a link to complete the d
       {/* Quote Preview Modal */}
       {selectedQuote && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-8 max-w-4xl w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl p-8 max-w-7xl w-full mx-4 shadow-2xl max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-800">Quote Preview</h2>
               <div className="flex items-center gap-3">
@@ -1257,9 +1266,18 @@ The client will receive an email with the PDF quote and a link to complete the d
                   </div>
               ) : templatePreviewHTML ? (
                 <div 
-                  className="template-preview-container"
-                  dangerouslySetInnerHTML={{ __html: templatePreviewHTML }}
-                />
+                  className="template-preview-container bg-white border-2 border-gray-200 rounded-xl shadow-lg overflow-hidden"
+                  style={{ 
+                    minHeight: '600px',
+                    maxHeight: '800px',
+                    overflow: 'auto'
+                  }}
+                >
+                  <div 
+                    className="p-8"
+                    dangerouslySetInnerHTML={{ __html: templatePreviewHTML }}
+                  />
+                </div>
               ) : (
                 <div className="text-center py-12">
                   <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">

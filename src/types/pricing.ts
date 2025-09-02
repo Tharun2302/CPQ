@@ -48,6 +48,18 @@ export interface PricingCalculation {
   tier: PricingTier;
 }
 
+export interface DealData {
+  dealId: string;
+  dealName: string;
+  amount: string;
+  closeDate?: string;
+  stage?: string;
+  ownerId?: string;
+  company?: string;
+  contactName?: string;
+  contactEmail?: string;
+}
+
 export interface Quote {
   id: string;
   clientName: string;
@@ -64,6 +76,7 @@ export interface Quote {
     name: string;
     isDefault: boolean;
   };
+  dealData?: DealData | null;
 }
 
 export interface User {

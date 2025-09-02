@@ -165,7 +165,8 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
     clientInfo,
     showPreview,
     calculation: calculation?.tier?.name,
-    configuration: configuration?.numberOfUsers
+    configuration: configuration?.numberOfUsers,
+    dealData: dealData
   });
 
   // Safety check - ensure we have required props
@@ -188,8 +189,17 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('🔍 handleSubmit - dealData:', dealData);
+    
     if (onGenerateQuote) {
-    onGenerateQuote(clientInfo);
+      // Create quote object with deal information
+      const quoteData = {
+        ...clientInfo,
+        dealData: dealData
+      };
+      
+      console.log('📝 Sending quote data:', quoteData);
+      onGenerateQuote(quoteData);
       setShowSuccessMessage(true);
       
       // Clear success message after 3 seconds
@@ -706,7 +716,9 @@ Total Price: {{total price}}`;
     );
   }
 
-  const QuotePreview = () => (
+  const QuotePreview = ({ dealData }: { dealData?: any }) => {
+    console.log('🔍 QuotePreview render - dealData:', dealData);
+    return (
     <div className="bg-gradient-to-br from-white via-slate-50/30 to-blue-50/20 p-10 border-2 border-blue-100 rounded-2xl shadow-2xl max-w-5xl mx-auto backdrop-blur-sm">
       {/* Header */}
       <div className="flex justify-between items-start mb-10 pb-6 border-b-2 border-gradient-to-r from-blue-200 to-indigo-200">
@@ -739,6 +751,31 @@ Total Price: {{total price}}`;
           <p className="text-gray-600 font-medium">{clientInfo.clientEmail}</p>
         </div>
       </div>
+
+      {/* Deal Information */}
+      {(dealData && (dealData.dealId || dealData.dealName)) && (
+        <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-8 rounded-2xl mb-10 border border-purple-200">
+          <h3 className="font-bold text-gray-900 mb-6 text-xl flex items-center gap-2">
+            <Building className="w-6 h-6 text-purple-600" />
+            Deal Information:
+          </h3>
+          <div className="grid grid-cols-2 gap-6">
+            {dealData.dealId && (
+              <div className="flex justify-between items-center bg-white/60 p-4 rounded-xl">
+                <span className="text-gray-700 font-semibold">Deal ID:</span>
+                <span className="font-bold text-gray-900">{dealData.dealId}</span>
+              </div>
+            )}
+            {dealData.dealName && (
+              <div className="flex justify-between items-center bg-white/60 p-4 rounded-xl">
+                <span className="text-gray-700 font-semibold">Deal Name:</span>
+                <span className="font-bold text-gray-900">{dealData.dealName}</span>
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
 
       {/* Project Details */}
       <div className="mb-10">
@@ -852,7 +889,8 @@ Total Price: {{total price}}`;
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   if (showPreview) {
     return (
@@ -888,7 +926,7 @@ Total Price: {{total price}}`;
             </button>
           </div>
         </div>
-        <QuotePreview />
+        <QuotePreview dealData={dealData} />
       </div>
     );
   }
@@ -962,16 +1000,7 @@ Total Price: {{total price}}`;
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
-                      {dealData.amount}
-                    </span>
-                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                      {dealData.stage || 'Active'}
-                    </span>
-                  </div>
-                </div>
+
               </div>
             )}
 
@@ -1057,14 +1086,23 @@ Total Price: {{total price}}`;
             {/* Success Message */}
             {showSuccessMessage && (
               <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-xl">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <div>
-                    <h3 className="font-semibold text-green-800">Quote Generated Successfully!</h3>
-                    <p className="text-green-700 text-sm">
-                      Your quote has been saved. You can view it in the Quotes tab.
-                    </p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    <div>
+                      <h3 className="font-semibold text-green-800">Quote Generated Successfully!</h3>
+                      <p className="text-green-700 text-sm">
+                        Your quote has been saved. You can view it in the Quotes tab.
+                      </p>
+                    </div>
                   </div>
+                  <button
+                    onClick={() => setShowPreview(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
+                  >
+                    <Eye className="w-4 h-4" />
+                    Preview Quote
+                  </button>
                 </div>
               </div>
             )}
@@ -1168,7 +1206,7 @@ Total Price: {{total price}}`;
         </div>
       )}
 
-      {showPreview && <QuotePreview />}
+
 
         {/* Placeholder Preview Modal */}
         {showPlaceholderPreview && placeholderPreviewData && (
