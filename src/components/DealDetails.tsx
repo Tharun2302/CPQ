@@ -9,7 +9,9 @@ import {
   ExternalLink,
   RefreshCw,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  ArrowRight,
+  Settings
 } from 'lucide-react';
 
 interface DealData {
@@ -27,9 +29,10 @@ interface DealData {
 interface DealDetailsProps {
   dealData?: DealData | null;
   onRefresh?: () => void;
+  onUseDealData?: (dealData: DealData) => void;
 }
 
-const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh }) => {
+const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh, onUseDealData }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   console.log('🔍 DealDetails render - dealData:', dealData);
@@ -59,6 +62,12 @@ const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh }) => {
       setIsLoading(true);
       await onRefresh();
       setIsLoading(false);
+    }
+  };
+
+  const handleUseDealData = () => {
+    if (onUseDealData && dealData) {
+      onUseDealData(dealData);
     }
   };
 
@@ -174,13 +183,21 @@ const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh }) => {
         )}
       </div>
 
-      {/* Additional Actions */}
+      {/* Use Deal Data Button */}
       <div className="mt-8 pt-6 border-t border-gray-200">
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-500">
             Last updated: {new Date().toLocaleString()}
           </div>
           <div className="flex space-x-3">
+            <button 
+              onClick={handleUseDealData}
+              className="flex items-center px-6 py-3 text-sm bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow-lg"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Use Deal Data
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </button>
             <button className="px-6 py-3 text-sm bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow-lg">
               Create Quote
             </button>

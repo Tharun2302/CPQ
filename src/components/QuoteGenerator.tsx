@@ -23,6 +23,18 @@ import {
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
+interface DealData {
+  dealId: string;
+  dealName: string;
+  amount: string;
+  closeDate?: string;
+  stage?: string;
+  ownerId?: string;
+  company?: string;
+  contactName?: string;
+  contactEmail?: string;
+}
+
 interface QuoteGeneratorProps {
   calculation: PricingCalculation;
   configuration: ConfigurationData;
@@ -42,6 +54,7 @@ interface QuoteGeneratorProps {
   };
   selectedTemplate?: any;
   onClientInfoChange?: (clientInfo: ClientInfo) => void;
+  dealData?: DealData | null;
 }
 
 interface ClientInfo {
@@ -58,7 +71,8 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
   onSelectHubSpotContact,
   companyInfo,
   selectedTemplate,
-  onClientInfoChange
+  onClientInfoChange,
+  dealData
 }) => {
   const [clientInfo, setClientInfo] = useState<ClientInfo>({
     clientName: '',
@@ -121,6 +135,22 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
       });
     }
   }, [hubspotState?.isConnected]);
+
+  // Auto-populate client info from deal data
+  useEffect(() => {
+    if (dealData && !hubspotState?.selectedContact) {
+      console.log('🔍 Auto-filling client info from deal data:', dealData);
+      
+      const newClientInfo = {
+        clientName: dealData.contactName || dealData.dealName || '',
+        clientEmail: dealData.contactEmail || '',
+        company: dealData.company || dealData.dealName.split(' ')[0] + ' Inc.'
+      };
+      
+      console.log('✅ New client info from deal data:', newClientInfo);
+      setClientInfo(newClientInfo);
+    }
+  }, [dealData, hubspotState?.selectedContact]);
 
   // Notify parent component when client info changes
   useEffect(() => {
@@ -914,6 +944,33 @@ Total Price: {{total price}}`;
                   <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                     Template Active
                   </span>
+                </div>
+              </div>
+            )}
+
+            {/* Deal Information Section */}
+            {dealData && (
+              <div className="flex items-center justify-between mb-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center">
+                    <Building className="w-3 h-3 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-800">Deal Information</h3>
+                    <p className="text-sm text-gray-600">
+                      Quote for deal: <span className="font-medium text-purple-700">{dealData.dealName}</span>
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                      {dealData.amount}
+                    </span>
+                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                      {dealData.stage || 'Active'}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
