@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { convertPdfToWord, downloadWordFile, isPdfFile, testDocxLibrary } from '../utils/pdfToWordConverter';
 import { createTemplateFromPdf } from '../utils/pdfToTemplate';
+import { extractTemplateContent } from '../utils/pdfMerger';
 
 interface Template {
   id: string;
@@ -25,6 +26,7 @@ interface Template {
   size: string;
   uploadDate: Date;
   isDefault: boolean;
+  content?: string; // Extracted template content
 }
 
 interface TemplateManagerProps {
@@ -137,7 +139,8 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
             ...template,
             file: template.fileData ? dataURLtoFile(template.fileData, template.fileName) : null,
             wordFile: template.wordFileData ? dataURLtoFile(template.wordFileData, template.wordFileName) : null,
-            uploadDate: new Date(template.uploadDate)
+            uploadDate: new Date(template.uploadDate),
+            content: template.content || null // Restore the extracted content
           }));
           setTemplates(templatesWithFiles);
         } catch (error) {
@@ -289,6 +292,11 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
     setIsUploading(true);
 
     try {
+      // Extract content from the uploaded template
+      console.log('📄 Extracting content from uploaded template...');
+      const extractedContent = await extractTemplateContent(newTemplate.file);
+      console.log('✅ Template content extracted:', extractedContent.substring(0, 100) + '...');
+
       const template: Template = {
         id: Date.now().toString(),
         name: newTemplate.name.trim(),
@@ -297,7 +305,8 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
         wordFile: newTemplate.wordFile,
         size: formatFileSize(newTemplate.file.size),
         uploadDate: new Date(),
-        isDefault: templates.length === 0 // First template becomes default
+        isDefault: templates.length === 0, // First template becomes default
+        content: extractedContent // Store the extracted content
       };
 
       // Add template to state
@@ -327,6 +336,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
         fileName: t.file ? t.file.name : null,
         wordFileData: t.wordFile ? await fileToDataURL(t.wordFile) : null,
         wordFileName: t.wordFile ? t.wordFile.name : null,
+        content: t.content, // Include the extracted content
         file: undefined,
         wordFile: undefined
       })));
@@ -477,9 +487,34 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
     }
   };
 
+  // Simple preview function to show original template content
+  const handleSimplePreview = (template: Template) => {
+    try {
+      console.log('🔍 Simple preview of original template:', template.name);
+      
+      // Create URL for original template
+      const originalUrl = URL.createObjectURL(template.file);
+      
+      // Set preview data and show modal (only original template)
+      setPreviewData({
+        template,
+        originalUrl,
+        processedUrl: originalUrl, // Use same URL for now
+        sampleQuote: null
+      });
+      setShowPreviewModal(true);
+      
+      console.log('✅ Simple template preview generated successfully');
+      
+    } catch (error) {
+      console.error('❌ Error in simple preview:', error);
+      alert('Failed to preview template. Please try again.');
+    }
+  };
+
   const handlePreviewTemplate = async (template: Template) => {
     try {
-      console.log('🔍 Previewing template:', template.name);
+      console.log('🔍 Previewing template with sample data:', template.name);
       setIsGeneratingPreview(true);
       
       // Check if we have a processed template for this template
@@ -537,7 +572,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
             migrationCost: 3000,
             instanceCost: 2000,
             totalCost: 11000
-          },
+        },
           selectedTier: {
             name: 'Professional',
             features: ['Feature 1', 'Feature 2', 'Feature 3']
@@ -1076,6 +1111,14 @@ The client will receive an email with the processed template and a link to compl
                 </button>
                 
                 <button
+                  onClick={() => handleSimplePreview(template)}
+                  className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors"
+                >
+                  <Eye className="w-4 h-4 inline mr-1" />
+                  View Original
+                </button>
+                
+                <button
                   onClick={() => handlePreviewTemplate(template)}
                   disabled={isGeneratingPreview}
                   className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
@@ -1088,7 +1131,7 @@ The client will receive an email with the processed template and a link to compl
                   ) : (
                     <>
                   <Eye className="w-4 h-4 inline mr-1" />
-                  Preview
+                  Preview with Sample Data
                     </>
                   )}
                 </button>
@@ -1315,24 +1358,49 @@ The client will receive an email with the processed template and a link to compl
 
 
 
-            {/* Processed Template Display */}
-            <div className="w-full">
+            {/* Original Template Display */}
+            <div className="w-full mb-8">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-green-600 font-bold text-sm">✓</span>
+                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 font-bold text-sm">📄</span>
                 </div>
-                {processedTemplates[previewData.template.id] 
-                  ? 'Template with Your Quote Data' 
-                  : 'Template with Sample Data'}
+                Original Template (Before Processing)
               </h3>
-              <div className="border-2 border-green-200 rounded-xl overflow-hidden">
+              <div className="border-2 border-blue-200 rounded-xl overflow-hidden">
                 <iframe
-                  src={previewData.processedUrl}
-                  className="w-full h-[800px]"
-                  title="Processed Template"
+                  src={previewData.originalUrl}
+                  className="w-full h-[600px]"
+                  title="Original Template"
                 />
               </div>
+              <p className="text-sm text-gray-600 mt-2 text-center">
+                This is your uploaded template with original placeholders like [Client.Company], [Quote.Total], etc.
+              </p>
             </div>
+
+            {/* Processed Template Display - Only show if we have processed data */}
+            {previewData.sampleQuote && (
+              <div className="w-full">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                    <span className="text-green-600 font-bold text-sm">✓</span>
+                  </div>
+                  {processedTemplates[previewData.template.id] 
+                    ? 'Template with Your Quote Data (After Processing)' 
+                    : 'Template with Sample Data (After Processing)'}
+                </h3>
+                <div className="border-2 border-green-200 rounded-xl overflow-hidden">
+                  <iframe
+                    src={previewData.processedUrl}
+                    className="w-full h-[600px]"
+                    title="Processed Template"
+                  />
+                </div>
+                <p className="text-sm text-gray-600 mt-2 text-center">
+                  This is how your template looks after placeholders are replaced with actual data.
+                </p>
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex gap-4 mt-8 pt-6 border-t border-gray-200">

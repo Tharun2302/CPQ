@@ -24,6 +24,11 @@ interface DealData {
   company?: string;
   contactName?: string;
   contactEmail?: string;
+  contactPhone?: string;
+  contactJobTitle?: string;
+  companyDomain?: string;
+  companyPhone?: string;
+  companyAddress?: string;
 }
 
 interface DealDetailsProps {
@@ -204,6 +209,96 @@ const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh, onUseDea
           </div>
         )}
       </div>
+
+      {/* Enhanced Contact & Company Information */}
+      {(dealData.contactName || dealData.company) && (
+        <div className="mt-8">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <UserCheck className="w-5 h-5 text-green-600" />
+            Contact & Company Information
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Company Name */}
+            {dealData.company && (
+              <div className="flex items-center p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-100">
+                <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center mr-4">
+                  <Building className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">Company Name</p>
+                  <p className="font-semibold text-gray-900 text-lg">{dealData.company}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Contact Name */}
+            {dealData.contactName && (
+              <div className="flex items-center p-4 bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl border border-teal-100">
+                <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center mr-4">
+                  <User className="w-5 h-5 text-teal-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">Contact Name</p>
+                  <p className="font-semibold text-gray-900 text-lg">{dealData.contactName}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Contact Email */}
+            {dealData.contactEmail && (
+              <div className="flex items-center p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+                  <div className="w-5 h-5 text-blue-600 text-center text-xs font-bold">@</div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">Contact Email</p>
+                  <p className="font-semibold text-gray-900 text-lg">{dealData.contactEmail}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Contact Phone */}
+            {dealData.contactPhone && (
+              <div className="flex items-center p-4 bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl border border-violet-100">
+                <div className="w-10 h-10 bg-violet-100 rounded-lg flex items-center justify-center mr-4">
+                  <div className="w-5 h-5 text-violet-600 text-center text-xs font-bold">📞</div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">Contact Phone</p>
+                  <p className="font-semibold text-gray-900 text-lg">{dealData.contactPhone}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Job Title */}
+            {dealData.contactJobTitle && (
+              <div className="flex items-center p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-100">
+                <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center mr-4">
+                  <div className="w-5 h-5 text-amber-600 text-center text-xs font-bold">💼</div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">Job Title</p>
+                  <p className="font-semibold text-gray-900 text-lg">{dealData.contactJobTitle}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Company Domain */}
+            {dealData.companyDomain && (
+              <div className="flex items-center p-4 bg-gradient-to-r from-rose-50 to-pink-50 rounded-xl border border-rose-100">
+                <div className="w-10 h-10 bg-rose-100 rounded-lg flex items-center justify-center mr-4">
+                  <div className="w-5 h-5 text-rose-600 text-center text-xs font-bold">🌐</div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">Company Domain</p>
+                  <p className="font-semibold text-gray-900 text-lg">{dealData.companyDomain}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Use Deal Data Button */}
       <div className="mt-8 pt-6 border-t border-gray-200">

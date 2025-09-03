@@ -490,18 +490,32 @@ const QuoteManager: React.FC<QuoteManagerProps> = ({
     try {
       // Find the template used for this quote
       let template = null;
+      console.log('🔍 Looking for template for quote:', quote.id);
+      console.log('🔍 Quote templateUsed:', quote.templateUsed);
+      console.log('🔍 Available templates:', templates);
+      
       if (quote.templateUsed && quote.templateUsed.id !== 'default') {
         template = templates.find(t => t.id === quote.templateUsed?.id);
         console.log('📄 Found template:', template);
+        if (template) {
+          console.log('📄 Template content preview:', template.content?.substring(0, 200) + '...');
+        }
       } else {
-        console.log('📄 Using default template');
+        console.log('📄 Using default template (no templateUsed or default template)');
+        // Try to find any available template
+        if (templates.length > 0) {
+          template = templates[0];
+          console.log('📄 Using first available template:', template.name);
+        }
       }
       
       console.log('🔄 Generating template preview HTML...');
+      console.log('🔄 Template being used:', template);
       // Generate template preview HTML
       const previewHTML = await createTemplatePreviewHTML(quote, template);
       console.log('✅ Template preview HTML generated successfully');
       console.log('📏 HTML length:', previewHTML.length);
+      console.log('📄 Preview HTML preview:', previewHTML.substring(0, 300) + '...');
       
       setTemplatePreviewHTML(previewHTML);
     } catch (error) {

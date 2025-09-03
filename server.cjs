@@ -761,14 +761,14 @@ app.get('/api/hubspot/deals', async (req, res) => {
   }
 });
 
-// Get specific HubSpot deal by ID
+// Get specific HubSpot deal by ID with enhanced company and contact data
 app.get('/api/hubspot/deal/:dealId', async (req, res) => {
   try {
     const { dealId } = req.params;
-    console.log('🔍 Fetching specific HubSpot deal:', dealId);
+    console.log('🔍 Fetching specific HubSpot deal with enhanced data:', dealId);
     
     if (HUBSPOT_API_KEY === 'demo-key') {
-      console.log('⚠️ Using demo data for specific deal');
+      console.log('⚠️ Using enhanced demo data for specific deal');
       return res.json({
         success: true,
         data: {
@@ -779,29 +779,107 @@ app.get('/api/hubspot/deal/:dealId', async (req, res) => {
             dealstage: 'proposal',
             closedate: '2024-12-31T00:00:00Z',
             hubspot_owner_id: 'demo-owner-123',
-            company: 'Demo Company',
-            contact_name: 'Demo Contact',
-            contact_email: 'demo@company.com'
+            company: 'Demo Company Inc.',
+            contact_name: 'John Smith',
+            contact_email: 'john.smith@democompany.com',
+            contact_phone: '+1 (555) 123-4567',
+            contact_job_title: 'IT Director',
+            company_domain: 'democompany.com',
+            company_phone: '+1 (555) 987-6543',
+            company_address: '123 Business Street, City, State 12345'
           }
         },
         isDemo: true
       });
     }
 
-    const response = await axios.get(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/${dealId}`, {
+    // Fetch deal with expanded properties
+    const dealResponse = await axios.get(`${HUBSPOT_BASE_URL}/crm/v3/objects/deals/${dealId}`, {
       headers: {
         'Authorization': `Bearer ${HUBSPOT_API_KEY}`,
         'Content-Type': 'application/json'
       },
       params: {
-        properties: 'dealname,amount,dealstage,closedate,hubspot_owner_id,company,contact_name,contact_email'
+        properties: 'dealname,amount,dealstage,closedate,hubspot_owner_id,company,contact_name,contact_email,contact_phone,contact_job_title'
       }
     });
 
-    console.log('✅ Specific HubSpot deal fetched successfully');
+    console.log('✅ Deal data fetched successfully');
+
+    // Extract deal properties
+    const dealProperties = dealResponse.data.properties;
+    let enhancedDealData = {
+      ...dealProperties,
+      company_domain: '',
+      company_phone: '',
+      company_address: ''
+    };
+
+    // Fetch associated company details if company ID exists
+    if (dealProperties.company) {
+      try {
+        console.log('🏢 Fetching company details for ID:', dealProperties.company);
+        const companyResponse = await axios.get(`${HUBSPOT_BASE_URL}/crm/v3/objects/companies/${dealProperties.company}`, {
+          headers: {
+            'Authorization': `Bearer ${HUBSPOT_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          params: {
+            properties: 'name,domain,phone,address'
+          }
+        });
+
+        const companyProperties = companyResponse.data.properties;
+        enhancedDealData = {
+          ...enhancedDealData,
+          company: companyProperties.name || dealProperties.company,
+          company_domain: companyProperties.domain || '',
+          company_phone: companyProperties.phone || '',
+          company_address: companyProperties.address || ''
+        };
+
+        console.log('✅ Company details fetched successfully');
+      } catch (companyError) {
+        console.warn('⚠️ Could not fetch company details:', companyError.message);
+      }
+    }
+
+    // Fetch associated contact details if contact ID exists
+    if (dealProperties.contact_name) {
+      try {
+        console.log('👤 Fetching contact details for ID:', dealProperties.contact_name);
+        const contactResponse = await axios.get(`${HUBSPOT_BASE_URL}/crm/v3/objects/contacts/${dealProperties.contact_name}`, {
+          headers: {
+            'Authorization': `Bearer ${HUBSPOT_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          params: {
+            properties: 'firstname,lastname,email,phone,jobtitle'
+          }
+        });
+
+        const contactProperties = contactResponse.data.properties;
+        enhancedDealData = {
+          ...enhancedDealData,
+          contact_name: `${contactProperties.firstname || ''} ${contactProperties.lastname || ''}`.trim(),
+          contact_email: contactProperties.email || '',
+          contact_phone: contactProperties.phone || '',
+          contact_job_title: contactProperties.jobtitle || ''
+        };
+
+        console.log('✅ Contact details fetched successfully');
+      } catch (contactError) {
+        console.warn('⚠️ Could not fetch contact details:', contactError.message);
+      }
+    }
+
+    console.log('✅ Enhanced deal data prepared successfully');
     res.json({
       success: true,
-      data: response.data,
+      data: {
+        id: dealId,
+        properties: enhancedDealData
+      },
       isDemo: false
     });
 
