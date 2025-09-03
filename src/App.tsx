@@ -58,16 +58,16 @@ function App() {
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [templates, setTemplates] = useState<any[]>([]);
 
-  // Current client info state with enhanced fields
+  // Current client info state with enhanced fields (no defaults)
   const [currentClientInfo, setCurrentClientInfo] = useState({
-    clientName: 'John Smith',
-    clientEmail: 'john.smith@democompany.com',
-    company: 'Demo Company Inc.',
-    phone: '+1 (555) 123-4567',
-    jobTitle: 'IT Director',
-    companyDomain: 'democompany.com',
-    companyPhone: '+1 (555) 987-6543',
-    companyAddress: '123 Business Street, City, State 12345'
+    clientName: '',
+    clientEmail: '',
+    company: '',
+    phone: '',
+    jobTitle: '',
+    companyDomain: '',
+    companyPhone: '',
+    companyAddress: ''
   });
 
   // Deal data state
@@ -125,10 +125,16 @@ function App() {
     const closeDate = urlParams.get('closeDate');
     const stage = urlParams.get('stage');
     const ownerId = urlParams.get('ownerId');
+    
+    // Enhanced HubSpot parameters (from your code)
+    const dealAmount = urlParams.get('deal.amount');
+    const contactEmailBDM = urlParams.get('ContactEmailBDM');
+    const contactEmail = urlParams.get('contactEmail');
+    const contactPerson = urlParams.get('contact person');
+    
     // Client information parameters
     const company = urlParams.get('company');
     const contactName = urlParams.get('contactName');
-    const contactEmail = urlParams.get('contactEmail');
     const contactPhone = urlParams.get('contactPhone');
     const contactJobTitle = urlParams.get('contactJobTitle');
     const companyDomain = urlParams.get('companyDomain');
@@ -142,9 +148,14 @@ function App() {
       closeDate,
       stage,
       ownerId,
+      // Enhanced HubSpot parameters
+      dealAmount,
+      contactEmailBDM,
+      contactEmail,
+      contactPerson,
+      // Client information parameters
       company,
       contactName,
-      contactEmail,
       contactPhone,
       contactJobTitle,
       companyDomain,
@@ -155,20 +166,23 @@ function App() {
     if (dealId) {
       const dealData = {
         dealId,
-        dealName: dealName || 'Unnamed Deal',
-        amount: amount || 'Not Set',
+        dealName: contactPerson ? `Deal for ${contactPerson}` : (dealName || 'Unnamed Deal'),
+        amount: dealAmount || amount || 'Not Set',
         closeDate: closeDate || '',
         stage: stage || 'Not Set',
         ownerId: ownerId || 'Not Set',
-        // Client information from URL parameters or demo data for localhost testing
-        company: company || 'Demo Company Inc.',
-        contactName: contactName || 'John Smith',
-        contactEmail: contactEmail || 'john.smith@democompany.com',
-        contactPhone: contactPhone || '+1 (555) 123-4567',
-        contactJobTitle: contactJobTitle || 'IT Director',
-        companyDomain: companyDomain || 'democompany.com',
-        companyPhone: companyPhone || '+1 (555) 987-6543',
-        companyAddress: companyAddress || '123 Business Street, City, State 12345'
+        // Enhanced client information from HubSpot parameters
+        company: company || 'Company from HubSpot',
+        contactName: contactPerson || contactName || 'Contact from HubSpot',
+        contactEmail: contactEmail || contactEmailBDM || 'email@hubspot.com',
+        contactPhone: contactPhone || '',
+        contactJobTitle: contactJobTitle || 'Position from HubSpot',
+        companyDomain: companyDomain || 'hubspot.com',
+        companyPhone: companyPhone || '',
+        companyAddress: companyAddress || 'Address from HubSpot',
+        // Store the original parameters for reference
+        contactPerson: contactPerson || '',
+        contactEmailBDM: contactEmailBDM || ''
       };
       
       console.log('📋 Created deal data:', dealData);
@@ -277,16 +291,16 @@ function App() {
         // You can add more auto-population here
       }));
       
-      // Auto-fill client information from deal data
+      // Auto-fill client information from deal data (no defaults)
       const enhancedClientInfo = {
-        clientName: dealParams.contactName || 'Demo Client',
-        clientEmail: dealParams.contactEmail || 'demo@company.com',
-        company: dealParams.company || 'Demo Company',
-        phone: dealParams.contactPhone || '+1 (555) 123-4567',
-        jobTitle: dealParams.contactJobTitle || 'Demo Position',
-        companyDomain: dealParams.companyDomain || 'democompany.com',
-        companyPhone: dealParams.companyPhone || '+1 (555) 987-6543',
-        companyAddress: dealParams.companyAddress || 'Demo Address'
+        clientName: dealParams.contactPerson || dealParams.contactName || '',
+        clientEmail: dealParams.contactEmail || dealParams.contactEmailBDM || '',
+        company: dealParams.company || '',
+        phone: dealParams.contactPhone || '',
+        jobTitle: dealParams.contactJobTitle || '',
+        companyDomain: dealParams.companyDomain || '',
+        companyPhone: dealParams.companyPhone || '',
+        companyAddress: dealParams.companyAddress || ''
       };
       
       setCurrentClientInfo(enhancedClientInfo);
