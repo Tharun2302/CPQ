@@ -177,7 +177,7 @@ function App() {
         stage: stage || 'Not Set',
         ownerId: ownerId || 'Not Set',
         // Contact Information from HubSpot
-        company: companyName || 'Company from HubSpot',
+        company: companyName || 'Not Available',
         contactName: contactFirstName && contactLastName ? `${contactFirstName} ${contactLastName}`.trim() : 'Contact from HubSpot',
         contactEmail: contactEmail || 'email@hubspot.com',
         contactPhone: contactPhone || '+1 (555) 123-4567',
@@ -299,12 +299,12 @@ function App() {
           `${dealParams.contactFirstName} ${dealParams.contactLastName}`.trim() : 
           (dealParams.contactName || 'Contact from HubSpot'),
         clientEmail: dealParams.contactEmail || 'email@hubspot.com',
-        company: dealParams.companyName || 'Company from HubSpot',
-        phone: dealParams.contactPhone || '+1 (555) 123-4567',
-        jobTitle: dealParams.contactJobTitle || 'Position from HubSpot',
-        companyDomain: dealParams.companyDomain || 'hubspot.com',
-        companyPhone: dealParams.companyPhone || '+1 (555) 987-6543',
-        companyAddress: dealParams.companyAddress || 'Address from HubSpot'
+        company: dealParams.companyName || 'Not Available',
+        phone: '',
+        jobTitle: '',
+        companyDomain: '',
+        companyPhone: '',
+        companyAddress: ''
       };
       
       setCurrentClientInfo(enhancedClientInfo);

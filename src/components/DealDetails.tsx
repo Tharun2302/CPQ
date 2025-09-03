@@ -257,45 +257,6 @@ const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh, onUseDea
                 </div>
               </div>
             )}
-
-            {/* Contact Phone */}
-            {dealData.contactPhone && (
-              <div className="flex items-center p-4 bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl border border-violet-100">
-                <div className="w-10 h-10 bg-violet-100 rounded-lg flex items-center justify-center mr-4">
-                  <div className="w-5 h-5 text-violet-600 text-center text-xs font-bold">📞</div>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">Contact Phone</p>
-                  <p className="font-semibold text-gray-900 text-lg">{dealData.contactPhone}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Job Title */}
-            {dealData.contactJobTitle && (
-              <div className="flex items-center p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-100">
-                <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center mr-4">
-                  <div className="w-5 h-5 text-amber-600 text-center text-xs font-bold">💼</div>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">Job Title</p>
-                  <p className="font-semibold text-gray-900 text-lg">{dealData.contactJobTitle}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Company Domain */}
-            {dealData.companyDomain && (
-              <div className="flex items-center p-4 bg-gradient-to-r from-rose-50 to-pink-50 rounded-xl border border-rose-100">
-                <div className="w-10 h-10 bg-rose-100 rounded-lg flex items-center justify-center mr-4">
-                  <div className="w-5 h-5 text-rose-600 text-center text-xs font-bold">🌐</div>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">Company Domain</p>
-                  <p className="font-semibold text-gray-900 text-lg">{dealData.companyDomain}</p>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}

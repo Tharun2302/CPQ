@@ -264,30 +264,6 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({ onConfigurationCh
                   {dealData.company || 'Not Available'}
                 </div>
               </div>
-              
-              {/* Job Title */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Job Title</label>
-                <div className="px-4 py-3 bg-white border-2 border-green-200 rounded-lg text-gray-800 font-medium">
-                  {dealData.contactJobTitle || 'Not Available'}
-                </div>
-              </div>
-              
-              {/* Phone Number */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
-                <div className="px-4 py-3 bg-white border-2 border-green-200 rounded-lg text-gray-800 font-medium">
-                  {dealData.contactPhone || 'Not Available'}
-                </div>
-              </div>
-              
-              {/* Company Domain */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Company Domain</label>
-                <div className="px-4 py-3 bg-white border-2 border-green-200 rounded-lg text-gray-800 font-medium">
-                  {dealData.companyDomain || 'Not Available'}
-                </div>
-              </div>
             </div>
             
             <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
