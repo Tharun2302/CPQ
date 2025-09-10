@@ -93,7 +93,6 @@ export const TOKEN_REPLACEMENT_MAP = {
   'total_price': (quoteData: QuoteData) => formatCurrency(quoteData.calculation.totalCost),
   'price_instance': (quoteData: QuoteData) => formatCurrency(quoteData.calculation.instanceCost),
   'priceinstance': (quoteData: QuoteData) => formatCurrency(quoteData.calculation.instanceCost),
-  'price_instance': (quoteData: QuoteData) => formatCurrency(quoteData.calculation.instanceCost),
   'total': (quoteData: QuoteData) => formatCurrency(quoteData.calculation.totalCost),
   'price': (quoteData: QuoteData) => formatCurrency(quoteData.calculation.totalCost),
   'amount': (quoteData: QuoteData) => formatCurrency(quoteData.calculation.totalCost),
