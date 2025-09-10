@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Navigation from './components/Navigation';
 import ConfigurationForm from './components/ConfigurationForm';
 import PricingComparison from './components/PricingComparison';
@@ -9,14 +9,13 @@ import QuoteGenerator from './components/QuoteGenerator';
 import QuoteManager from './components/QuoteManager';
 import TemplateManager from './components/TemplateManager';
 import DealDetails from './components/DealDetails';
-import DealComponents from './components/DealComponents';
 
 import Analytics from './components/Analytics';
 import Settings from './components/Settings';
 import DigitalSignatureForm from './components/DigitalSignatureForm';
-import { ConfigurationData, PricingCalculation, PricingTier, PricingTierConfiguration, Quote } from './types/pricing';
+import { ConfigurationData, PricingCalculation, PricingTier, Quote } from './types/pricing';
 import { calculateAllTiers, getRecommendedTier, PRICING_TIERS } from './utils/pricing';
-import { FileText, Building } from 'lucide-react';
+import { FileText } from 'lucide-react';
 
 function App() {
   const [activeTab, setActiveTab] = useState('configure');
@@ -366,19 +365,21 @@ function App() {
     
     if (dealParams) {
       // Auto-populate the configuration form with deal data
-      setConfiguration(prev => ({
-        ...prev,
-        clientName: dealParams.dealName,
-        // You can add more auto-population here
-      }));
+      setConfiguration(prev => {
+        if (prev) {
+          return {
+            ...prev,
+            clientName: dealParams.dealName,
+          };
+        }
+        return prev;
+      });
       
       // Auto-fill client information from deal data
       const enhancedClientInfo = {
-        clientName: dealParams.contactFirstName && dealParams.contactLastName ? 
-          `${dealParams.contactFirstName} ${dealParams.contactLastName}`.trim() : 
-          (dealParams.contactName || 'Contact from HubSpot'),
+        clientName: dealParams.contactName || 'Contact from HubSpot',
         clientEmail: dealParams.contactEmail || 'email@hubspot.com',
-        company: dealParams.companyName || 'Not Available',
+        company: dealParams.company || 'Not Available',
         phone: '',
         jobTitle: '',
         companyDomain: '',
@@ -640,7 +641,7 @@ function App() {
     }
   };
 
-  const handleSignatureFormComplete = (signatureData: any, approvalStatus: string, comments: string) => {
+  const handleSignatureFormComplete = (_signatureData: any, approvalStatus: string, _comments: string) => {
     alert(`Thank you! Your ${approvalStatus === 'approved' ? 'approval' : 'response'} has been submitted successfully.`);
     // Redirect to a thank you page or close the form
     window.location.href = '/';
@@ -1256,8 +1257,8 @@ function App() {
             perGBCost: 1.00,
             managedMigrationCost: 300,
             instanceCost: 0,
-            userLimits: { minUsers: 1, maxUsers: 100 },
-            gbLimits: { minGB: 0, maxGB: 1000 },
+            userLimits: { from: 1, to: 100 },
+            gbLimits: { from: 0, to: 1000 },
             features: ['Basic migration support', 'Email support']
           }
         };
@@ -1286,7 +1287,18 @@ function App() {
             onSelectHubSpotContact={(contact) => updateHubspotState({ selectedContact: contact })}
             companyInfo={companyInfo}
             selectedTemplate={selectedTemplate}
-            onClientInfoChange={setCurrentClientInfo}
+            onClientInfoChange={(clientInfo) => {
+              setCurrentClientInfo({
+                clientName: clientInfo.clientName,
+                clientEmail: clientInfo.clientEmail,
+                company: clientInfo.company,
+                phone: '',
+                jobTitle: '',
+                companyDomain: '',
+                companyPhone: '',
+                companyAddress: ''
+              });
+            }}
             dealData={activeDealData}
             configureContactInfo={configureContactInfo}
           />
