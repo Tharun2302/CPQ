@@ -251,7 +251,7 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
     if (onGenerateQuote) {
       // Create quote object with deal information
       const quoteData: Quote = {
-        id: `quote-${Date.now()}`,
+        id: `quote-001`,
         clientName: clientInfo.clientName,
         clientEmail: clientInfo.clientEmail,
         company: clientInfo.company,
@@ -288,7 +288,7 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
 
     // Create quote object for preview
     const quote = {
-      id: `quote-${Date.now()}`,
+      id: `quote-001`,
       clientName: clientInfo.clientName,
       clientEmail: clientInfo.clientEmail,
       company: clientInfo.company,
@@ -762,7 +762,7 @@ Total Price: {{total price}}`;
 
       // Create quote data for template processing
       const quoteData = {
-        id: `quote-${Date.now()}`,
+        id: `quote-001`,
         company: clientInfo.company || clientInfo.clientName || 'Demo Company Inc.',
         clientName: clientInfo.clientName,
         clientEmail: clientInfo.clientEmail,
@@ -794,7 +794,7 @@ Total Price: {{total price}}`;
           price: finalCalculation.totalCost,
           features: finalCalculation.tier.features
         },
-        quoteId: `QTE-${Date.now()}`,
+        quoteId: `QTE-001`,
         generatedDate: new Date(),
         status: 'draft'
       };
@@ -1226,7 +1226,7 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
     try {
       // Create quote object
       const quote = {
-        id: `quote-${Date.now()}`,
+        id: `quote-001`,
         clientName: clientInfo.clientName,
         clientEmail: clientInfo.clientEmail,
         company: clientInfo.company,
@@ -1478,7 +1478,7 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
                   try {
                     // Create quote object
                     const quote = {
-                      id: `quote-${Date.now()}`,
+                      id: `quote-001`,
                       clientName: clientInfo.clientName,
                       clientEmail: clientInfo.clientEmail,
                       company: clientInfo.company,

@@ -185,7 +185,7 @@ export const convertToTemplateBlocks = (content: ExtractedContent): ContentBlock
 
   // Quote Details Block
   blocks.push({
-    id: `block-${Date.now()}-quote-details`,
+    id: `block-001-quote-details`,
     type: 'quote-details',
     content: {
       quoteNumber: 'CPQ-{AUTO}',

@@ -343,7 +343,7 @@ export class PDFOrchestratorIntegration {
       console.log('🔄 PDFOrchestratorIntegration: Creating quote data from existing quote...');
       
       const formattedQuoteData: QuoteData = {
-        id: quoteData.id || `quote-${Date.now()}`,
+        id: quoteData.id || `quote-001`,
         clientName: quoteData.clientName || 'N/A',
         clientEmail: quoteData.clientEmail || 'N/A',
         company: quoteData.company || 'N/A',

@@ -21,10 +21,7 @@ export function formatCurrency(amount: number, currency: string = 'USD'): string
  * Generate unique quote ID
  */
 export function generateQuoteId(): string {
-  const timestamp = Date.now().toString();
-  const random1 = Math.random().toString(36).substring(2, 7).toUpperCase();
-  const random2 = Math.random().toString(36).substring(2, 7).toUpperCase();
-  return `QTE-${random1}-${random2}`;
+  return `QTE-001`;
 }
 
 /**
