@@ -57,6 +57,167 @@ function App() {
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [templates, setTemplates] = useState<any[]>([]);
 
+  // Load selected template from localStorage on app start
+  useEffect(() => {
+    const loadSelectedTemplate = async () => {
+      const savedSelectedTemplate = localStorage.getItem('cpq_selected_template');
+      if (savedSelectedTemplate) {
+        try {
+          const parsedTemplate = JSON.parse(savedSelectedTemplate);
+          console.log('🔍 Loaded selected template from localStorage:', {
+            id: parsedTemplate.id,
+            name: parsedTemplate.name,
+            hasFile: !!parsedTemplate.file,
+            hasFileData: !!parsedTemplate.fileData,
+            fileName: parsedTemplate.fileName
+          });
+          
+          // Convert data URLs back to File objects
+          const templateWithFiles = {
+            ...parsedTemplate,
+            file: parsedTemplate.fileData ? dataURLtoFile(parsedTemplate.fileData, parsedTemplate.fileName) : null,
+            wordFile: parsedTemplate.wordFileData ? dataURLtoFile(parsedTemplate.wordFileData, parsedTemplate.wordFileName) : null,
+            uploadDate: parsedTemplate.uploadDate ? new Date(parsedTemplate.uploadDate) : new Date()
+          };
+          
+          setSelectedTemplate(templateWithFiles);
+          console.log('✅ Loaded selected template from localStorage:', parsedTemplate.name);
+        } catch (error) {
+          console.error('❌ Error loading selected template from localStorage:', error);
+          localStorage.removeItem('cpq_selected_template');
+        }
+      }
+    };
+    
+    loadSelectedTemplate();
+  }, []);
+
+  // Helper function to convert base64 data URL back to File
+  const dataURLtoFile = (dataURL: string, fileName: string): File => {
+    const arr = dataURL.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], fileName, { type: mime });
+  };
+
+  // Load templates from localStorage on app start
+  useEffect(() => {
+    const loadTemplates = () => {
+      const savedTemplates = localStorage.getItem('cpq_templates');
+      if (savedTemplates) {
+        try {
+          const parsedTemplates = JSON.parse(savedTemplates);
+          // Convert base64 strings back to File objects
+          const templatesWithFiles = parsedTemplates.map((template: any) => ({
+            ...template,
+            file: template.fileData ? dataURLtoFile(template.fileData, template.fileName) : null,
+            wordFile: template.wordFileData ? dataURLtoFile(template.wordFileData, template.wordFileName) : null,
+            uploadDate: new Date(template.uploadDate),
+            content: template.content || null
+          }));
+          setTemplates(templatesWithFiles);
+          console.log('✅ Loaded templates from localStorage:', templatesWithFiles.length, 'templates');
+        } catch (error) {
+          console.error('❌ Error loading templates from localStorage:', error);
+        }
+      }
+    };
+
+    loadTemplates();
+
+    // Listen for template updates from TemplateManager
+    const handleTemplatesUpdated = () => {
+      console.log('🔄 Templates updated event received, reloading...');
+      loadTemplates();
+    };
+
+    window.addEventListener('templatesUpdated', handleTemplatesUpdated);
+    
+    return () => {
+      window.removeEventListener('templatesUpdated', handleTemplatesUpdated);
+    };
+  }, []);
+
+  // Sync selected template with loaded templates
+  useEffect(() => {
+    if (selectedTemplate && templates.length > 0) {
+      // Check if the selected template still exists in the loaded templates
+      const templateExists = templates.find(t => t.id === selectedTemplate.id);
+      if (!templateExists) {
+        console.log('⚠️ Selected template no longer exists, clearing selection');
+        setSelectedTemplate(null);
+      } else {
+        // Check if the selected template has a file, if not, use the one from templates array
+        const templateToUse = selectedTemplate.file ? selectedTemplate : templateExists;
+        
+        console.log('🔍 Syncing selected template with loaded template:', {
+          id: templateToUse.id,
+          name: templateToUse.name,
+          hasFile: !!templateToUse.file,
+          fileType: templateToUse.file?.type,
+          fileName: templateToUse.file?.name,
+          usingFallback: !selectedTemplate.file
+        });
+        
+        setSelectedTemplate(templateToUse);
+        console.log('✅ Synced selected template with loaded templates:', templateToUse.name);
+      }
+    }
+  }, [templates, selectedTemplate]);
+
+  // Helper function to convert File to data URL
+  const fileToDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Save selected template to localStorage whenever it changes
+  useEffect(() => {
+    if (selectedTemplate) {
+      try {
+        console.log('🔍 Saving selected template to localStorage:', {
+          id: selectedTemplate.id,
+          name: selectedTemplate.name,
+          hasFile: !!selectedTemplate.file,
+          fileType: selectedTemplate.file?.type,
+          fileName: selectedTemplate.file?.name
+        });
+        
+        // Convert File objects to data URLs for storage
+        const saveTemplate = async () => {
+          const templateForStorage = {
+            ...selectedTemplate,
+            fileData: selectedTemplate.file ? await fileToDataURL(selectedTemplate.file) : null,
+            fileName: selectedTemplate.file ? selectedTemplate.file.name : null,
+            wordFileData: selectedTemplate.wordFile ? await fileToDataURL(selectedTemplate.wordFile) : null,
+            wordFileName: selectedTemplate.wordFile ? selectedTemplate.wordFile.name : null,
+            file: undefined, // Remove file object as it can't be serialized
+            wordFile: undefined
+          };
+          
+          localStorage.setItem('cpq_selected_template', JSON.stringify(templateForStorage));
+          console.log('✅ Saved selected template to localStorage:', selectedTemplate.name);
+        };
+        
+        saveTemplate();
+      } catch (error) {
+        console.error('❌ Error saving selected template to localStorage:', error);
+      }
+    } else {
+      localStorage.removeItem('cpq_selected_template');
+      console.log('🗑️ Removed selected template from localStorage');
+    }
+  }, [selectedTemplate]);
+
   // Current client info state with enhanced fields
   const [currentClientInfo, setCurrentClientInfo] = useState({
     clientName: 'John Smith',
@@ -428,7 +589,7 @@ function App() {
     }
 
     return {
-      id: `quote-${Date.now()}`,
+      id: `quote-001`,
       clientName: currentClientInfo.clientName || 'Current Client',
       clientEmail: currentClientInfo.clientEmail || 'client@example.com',
       company: currentClientInfo.company || 'Current Company',
@@ -756,18 +917,6 @@ function App() {
     };
   }, []);
 
-  // Helper function to convert data URL to File object
-  const dataURLtoFile = (dataURL: string, filename: string): File => {
-    const arr = dataURL.split(',');
-    const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new File([u8arr], filename, { type: mime });
-  };
 
   // Save company information to localStorage whenever it changes
   useEffect(() => {
@@ -903,7 +1052,7 @@ function App() {
 
     // Create a new quote
     const newQuote: Quote = {
-      id: `quote-${Date.now()}`,
+      id: `quote-001`,
       clientName: clientInfo.clientName,
       clientEmail: clientInfo.clientEmail,
       company: clientInfo.company,
@@ -1021,6 +1170,19 @@ function App() {
     console.log('🔄 Templates updated, reloading...');
   };
 
+  // Handle template selection from TemplateManager
+  const handleTemplateSelect = (template: any) => {
+    console.log('🎯 Template selected:', template?.name || 'None');
+    console.log('🔍 Template details:', {
+      id: template?.id,
+      name: template?.name,
+      hasFile: !!template?.file,
+      fileType: template?.file?.type,
+      fileName: template?.file?.name
+    });
+    setSelectedTemplate(template);
+  };
+
   const renderContent = () => {
     // Handle signature form display
     if (isSignatureForm && signatureFormData) {
@@ -1081,6 +1243,9 @@ function App() {
               onSubmit={handleSubmitConfiguration}
               dealData={activeDealData}
               onContactInfoChange={handleConfigureContactInfoChange}
+              templates={templates}
+              selectedTemplate={selectedTemplate}
+              onTemplateSelect={handleTemplateSelect}
             />
             
             {showPricing && calculations.length > 0 && (
@@ -1319,7 +1484,7 @@ function App() {
       case 'templates':
         return (
           <TemplateManager
-            onTemplateSelect={setSelectedTemplate}
+            onTemplateSelect={handleTemplateSelect}
             selectedTemplate={selectedTemplate}
             onTemplatesUpdate={handleTemplatesUpdate}
             currentQuoteData={getCurrentQuoteData()}

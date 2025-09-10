@@ -1649,7 +1649,7 @@ export const createTemplatePreviewHTML = async (
   template?: any
 ): Promise<string> => {
   try {
-    const quoteNumber = `CPQ-${quote.id.split('-')[1]}`;
+    const quoteNumber = `CPQ-001`;
     const currentDate = new Date().toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: 'long', 
@@ -2015,7 +2015,7 @@ const extractQuoteValues = (quote: Quote) => {
     duration_months: quote.configuration.duration.toString(),
     client_name: quote.clientName,
     client_email: quote.clientEmail,
-    quote_number: `CPQ-${quote.id.split('-')[1]}`,
+    quote_number: `CPQ-001`,
     date: new Date().toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: 'long', 

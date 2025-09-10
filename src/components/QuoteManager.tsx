@@ -495,7 +495,7 @@ const QuoteManager: React.FC<QuoteManagerProps> = ({
 
       // Get current date
       const currentDate = new Date().toLocaleDateString();
-      const quoteNumber = quote.id || `Q-${Date.now().toString().slice(-6)}`;
+      const quoteNumber = quote.id || `Q-001`;
 
       // Generate the professional quote HTML matching the QuoteGenerator format
       const professionalQuoteHTML = `

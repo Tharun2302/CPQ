@@ -103,7 +103,7 @@ export function createPlaceholderMap(quoteData: QuoteData): PlaceholderMap {
     
     // Quote Information
     'quoteId': quoteData.id,
-    'quoteNumber': `CPQ-${quoteData.id.split('-')[1] || Date.now().toString().slice(-6)}`,
+    'quoteNumber': `CPQ-001`,
     'quoteDate': formatDate(quoteData.createdAt),
     
     // Configuration
@@ -222,7 +222,7 @@ export async function generateQuotePDF(quoteData: QuoteData): Promise<Blob> {
     
     // Quote Information
     doc.setFontSize(12);
-    doc.text(`Quote ID: CPQ-${quoteData.id.split('-')[1] || Date.now().toString().slice(-6)}`, 20, 50);
+    doc.text(`Quote ID: CPQ-001`, 20, 50);
     doc.text(`Date: ${quoteData.createdAt.toLocaleDateString()}`, 20, 60);
     
     // Client Information

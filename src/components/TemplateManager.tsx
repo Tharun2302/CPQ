@@ -58,6 +58,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
     sampleQuote: any;
   } | null>(null);
   const [iframeLoadError, setIframeLoadError] = useState(false);
+  const [iframeLoading, setIframeLoading] = useState(false);
   const [processedTemplates, setProcessedTemplates] = useState<{[key: string]: File}>({});
   const [newTemplate, setNewTemplate] = useState({
     name: '',
@@ -904,7 +905,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
         <div class="document">
           <div class="header">
             <h1>CloudFuze Purchase Agreement</h1>
-            <p>Quote #: CPQ-${Date.now().toString().slice(-6)}</p>
+            <p>Quote #: CPQ-001</p>
             <p>Date: ${new Date().toLocaleDateString()}</p>
           </div>
 
@@ -1062,37 +1063,91 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
   const handleSimplePreview = (template: Template) => {
     try {
       console.log('🔍 Simple preview of original template:', template.name);
+      console.log('🔍 Template file details:', {
+        hasFile: !!template.file,
+        fileType: template.file?.type,
+        fileName: template.file?.name,
+        fileSize: template.file?.size
+      });
+      
+      // Check if template has a valid file, if not try to find it in templates array
+      let templateToUse = template;
+      if (!template.file) {
+        console.log('⚠️ Template file missing, looking for template in templates array...');
+        const templateFromArray = templates.find(t => t.id === template.id);
+        if (templateFromArray && templateFromArray.file) {
+          templateToUse = templateFromArray;
+          console.log('✅ Found template with file in templates array');
+        } else {
+          console.error('❌ Template does not have a valid file for preview');
+          alert('Template file is not available for preview. Please re-upload the template.');
+        return;
+      }
+      }
       
       // Create URL for original template
-      const originalUrl = URL.createObjectURL(template.file);
+      const originalUrl = URL.createObjectURL(templateToUse.file);
+      console.log('✅ Created object URL for template preview:', originalUrl);
+      console.log('🔍 File type for preview:', templateToUse.file.type);
       
       // Set preview data and show modal (only original template)
         setPreviewData({
-          template,
+        template: templateToUse,
           originalUrl,
         processedUrl: originalUrl, // Use same URL for now
         sampleQuote: null
         });
+      setIframeLoading(true);
+      setIframeLoadError(false);
         setShowPreviewModal(true);
         
       console.log('✅ Simple template preview generated successfully');
       
     } catch (error) {
       console.error('❌ Error in simple preview:', error);
-      alert('Failed to preview template. Please try again.');
+      alert('Failed to preview template. Please try again or re-upload the template.');
     }
   };
 
 
   const handleDownloadTemplate = (template: Template) => {
-    const url = URL.createObjectURL(template.file);
+    try {
+      console.log('🔍 Downloading template:', template.name);
+      console.log('🔍 Template file details:', {
+        hasFile: !!template.file,
+        fileType: template.file?.type,
+        fileName: template.file?.name
+      });
+      
+      // Check if template has a valid file, if not try to find it in templates array
+      let templateToUse = template;
+      if (!template.file) {
+        console.log('⚠️ Template file missing, looking for template in templates array...');
+        const templateFromArray = templates.find(t => t.id === template.id);
+        if (templateFromArray && templateFromArray.file) {
+          templateToUse = templateFromArray;
+          console.log('✅ Found template with file in templates array');
+      } else {
+          console.error('❌ Template does not have a valid file for download');
+          alert('Template file is not available for download. Please re-upload the template.');
+          return;
+        }
+      }
+      
+      const url = URL.createObjectURL(templateToUse.file);
     const a = document.createElement('a');
     a.href = url;
-    a.download = template.name + '.pdf';
+      a.download = templateToUse.name + '.pdf';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+      
+      console.log('✅ Template downloaded successfully');
+    } catch (error) {
+      console.error('❌ Error downloading template:', error);
+      alert('Failed to download template. Please try again.');
+    }
   };
 
   const handleDownloadWordTemplate = (template: Template) => {
@@ -1205,7 +1260,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
         signatureData: signatureData
       };
       
-      const quoteNumber = `CPQ-${quote.id?.split('-')[1] || Date.now().toString().slice(-6)}`;
+      const quoteNumber = `CPQ-001`;
       
       // Process template with signature data for verification
       const { mergeQuoteWithPlaceholders } = await import('../utils/pdfMerger');
@@ -1279,7 +1334,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
         throw new Error('No quote data available. Please generate a quote first.');
       }
 
-      const quoteNumber = `CPQ-${Date.now().toString().slice(-6)}`;
+      const quoteNumber = `CPQ-001`;
       
       // Create enhanced quote data with signature information
       const enhancedQuoteData = {
@@ -1862,6 +1917,8 @@ The client will receive an email with the processed template and a link to compl
                 onClick={() => {
                   setShowPreviewModal(false);
                   setPreviewData(null);
+                  setIframeLoading(false);
+                  setIframeLoadError(false);
                   // Clean up URLs
                   if (previewData) {
                     URL.revokeObjectURL(previewData.originalUrl);
@@ -1910,19 +1967,38 @@ The client will receive an email with the processed template and a link to compl
                       </div>
                     </div>
                   ) : (
+                <div className="w-full h-[600px] border-2 border-blue-200 rounded-xl overflow-hidden relative">
+                  {iframeLoading && (
+                    <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center z-10">
+                      <div className="text-center">
+                        <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                        <p className="text-gray-600 font-medium">Loading template preview...</p>
+                </div>
+                    </div>
+                  )}
                 <iframe
                   src={previewData.originalUrl}
-                  className="w-full h-[600px]"
+                    className="w-full h-full"
                   title="Original Template"
+                    style={{ border: 'none' }}
                       onError={(e) => {
                         console.error('❌ Iframe failed to load:', e);
                         setIframeLoadError(true);
+                      setIframeLoading(false);
                       }}
                       onLoad={(e) => {
                         console.log('✅ Iframe loaded successfully');
                         setIframeLoadError(false);
-                      }}
-                    />
+                      setIframeLoading(false);
+                    }}
+                  />
+                  {/* Fallback message for PDF files */}
+                  <div className="absolute bottom-4 left-4 right-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm text-blue-800 text-center">
+                      💡 <strong>Tip:</strong> If the PDF doesn't display, try the "Open in New Tab" button below.
+                    </p>
+                  </div>
+                </div>
                   )}
               </div>
               <p className="text-sm text-gray-600 mt-2 text-center">
@@ -1994,6 +2070,8 @@ The client will receive an email with the processed template and a link to compl
                 onClick={() => {
                   setShowPreviewModal(false);
                   setPreviewData(null);
+                  setIframeLoading(false);
+                  setIframeLoadError(false);
                   // Clean up URLs
                   if (previewData) {
                     URL.revokeObjectURL(previewData.originalUrl);
@@ -2007,6 +2085,16 @@ The client will receive an email with the processed template and a link to compl
               {/* Show different buttons based on whether it's original or processed template */}
               {!previewData.sampleQuote ? (
                 // Original template buttons
+                <>
+                  <button
+                    onClick={() => {
+                      // Open template in new tab
+                      window.open(previewData.originalUrl, '_blank');
+                    }}
+                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold"
+                  >
+                    Open in New Tab
+                  </button>
                 <button
                   onClick={() => {
                     // Download the original template
@@ -2021,6 +2109,7 @@ The client will receive an email with the processed template and a link to compl
                 >
                   Download Original Template
                 </button>
+                </>
               ) : (
                 // Processed template buttons
                 <>

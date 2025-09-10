@@ -304,7 +304,7 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
       }
     };
 
-    const quoteNumber = `CPQ-${Date.now().toString().slice(-6)}`;
+    const quoteNumber = `CPQ-001`;
 
     // Define placeholder mappings - match exact placeholders from template
     const placeholderMappings = {
@@ -689,13 +689,25 @@ Total Price: {{total price}}`;
       
       // Check if a template is selected
       if (!selectedTemplate) {
+        console.log('❌ No template selected');
         alert('Please select a template first in the Template session before generating an agreement.');
         return;
       }
 
+      console.log('🔍 Selected template details:', {
+        id: selectedTemplate.id,
+        name: selectedTemplate.name,
+        hasFile: !!selectedTemplate.file,
+        fileType: selectedTemplate.file?.type,
+        fileName: selectedTemplate.file?.name,
+        fileSize: selectedTemplate.file?.size,
+        lastModified: selectedTemplate.file?.lastModified
+      });
+
       // Check if template has a file
       if (!selectedTemplate.file) {
-        alert('Selected template does not have a valid file. Please select a different template.');
+        console.error('❌ Selected template missing file:', selectedTemplate);
+        alert('Selected template does not have a valid file. Please go to the Template session and re-select your template.');
         return;
       }
 
@@ -1236,7 +1248,7 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
         
         try {
         // Generate quote number
-        const quoteNumber = `CPQ-${Date.now().toString().slice(-6)}`;
+        const quoteNumber = `CPQ-001`;
         
           // Check if this is an SOW template with placeholders
           const { detectPlaceholders } = await import('../utils/pdfMerger');
@@ -1482,7 +1494,7 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
                       }
                     };
 
-                    const quoteNumber = `CPQ-${Date.now().toString().slice(-6)}`;
+                    const quoteNumber = `CPQ-001`;
                     
                     console.log('🔄 Starting placeholder replacement for template:', selectedTemplate.name);
                     

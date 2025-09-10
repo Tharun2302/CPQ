@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ConfigurationData } from '../types/pricing';
-import { Calculator, Users, Server, Clock, Database, ArrowRight, Sparkles, UserCheck } from 'lucide-react';
+import { Calculator, Users, Server, Clock, Database, ArrowRight, Sparkles, UserCheck, FileText } from 'lucide-react';
 
 interface DealData {
   dealId: string;
@@ -19,14 +19,34 @@ interface DealData {
   companyAddress?: string;
 }
 
+interface Template {
+  id: string;
+  name: string;
+  description?: string;
+  file?: File;
+  uploadDate?: Date;
+  isDefault?: boolean;
+}
+
 interface ConfigurationFormProps {
   onConfigurationChange: (config: ConfigurationData) => void;
   onSubmit: () => void;
   dealData?: DealData | null;
   onContactInfoChange?: (contactInfo: { clientName: string; clientEmail: string; company: string }) => void;
+  templates?: Template[];
+  selectedTemplate?: Template | null;
+  onTemplateSelect?: (template: Template | null) => void;
 }
 
-const ConfigurationForm: React.FC<ConfigurationFormProps> = ({ onConfigurationChange, onSubmit, dealData, onContactInfoChange }) => {
+const ConfigurationForm: React.FC<ConfigurationFormProps> = ({ 
+  onConfigurationChange, 
+  onSubmit, 
+  dealData, 
+  onContactInfoChange,
+  templates = [],
+  selectedTemplate,
+  onTemplateSelect
+}) => {
   const [config, setConfig] = useState<ConfigurationData>({
     numberOfUsers: 1,
     instanceType: 'Small',
@@ -233,6 +253,56 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({ onConfigurationCh
               </select>
             </div>
           </div>
+
+          {/* Template Selection - Show when migration type is selected */}
+          {config.migrationType && templates.length > 0 && (
+            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl shadow-lg border border-purple-200 p-8">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <FileText className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Select Combination</h3>
+                <p className="text-gray-600">Choose a combination for your {config.migrationType.toLowerCase()} migration quote</p>
+              </div>
+              
+              <div className="max-w-md mx-auto">
+                <label className="flex items-center gap-3 text-lg font-semibold text-gray-800 mb-4">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-white" />
+                  </div>
+                  Combination
+                </label>
+                <select
+                  value={selectedTemplate?.id || ''}
+                  onChange={(e) => {
+                    const template = templates.find(t => t.id === e.target.value) || null;
+                    if (onTemplateSelect) {
+                      onTemplateSelect(template);
+                    }
+                  }}
+                  className="w-full px-6 py-4 border-2 border-purple-200 rounded-xl focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 bg-white/90 backdrop-blur-sm hover:border-purple-300 text-lg font-medium"
+                >
+                  <option value="">Select Combination</option>
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name} {template.isDefault ? '(Default)' : ''}
+                    </option>
+                  ))}
+                </select>
+                
+                {selectedTemplate && (
+                  <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <p className="text-sm text-purple-700">
+                      <strong>Selected:</strong> {selectedTemplate.name}
+                      {selectedTemplate.description && (
+                        <span className="block mt-1 text-purple-600">{selectedTemplate.description}</span>
+                      )}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Other Configuration Fields - Conditional Rendering */}
           {config.migrationType && (
