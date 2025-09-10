@@ -47,6 +47,20 @@ CREATE TABLE IF NOT EXISTS hubspot_integrations (
   FOREIGN KEY (quote_id) REFERENCES quotes(id) ON DELETE CASCADE
 );
 
+-- Create templates table
+CREATE TABLE IF NOT EXISTS templates (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  file_name VARCHAR(255) NOT NULL,
+  file_type ENUM('pdf', 'docx') NOT NULL,
+  file_data LONGBLOB NOT NULL,
+  file_size INT NOT NULL,
+  is_default BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 -- Insert default pricing tiers
 INSERT IGNORE INTO pricing_tiers (id, name, per_user_cost, per_gb_cost, managed_migration_cost, instance_cost, user_limits, gb_limits, features) VALUES
 ('basic', 'Basic', 25.00, 2.50, 500.00, 100.00, '{"from": 1, "to": 50}', '{"from": 10, "to": 500}', '["Basic support", "Standard migration", "Email support", "Basic reporting"]'),
@@ -60,6 +74,7 @@ SHOW TABLES;
 DESCRIBE quotes;
 DESCRIBE pricing_tiers;
 DESCRIBE hubspot_integrations;
+DESCRIBE templates;
 
 -- Show default pricing tiers
 SELECT * FROM pricing_tiers;

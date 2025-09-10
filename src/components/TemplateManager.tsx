@@ -14,9 +14,9 @@ import {
   Send
 } from 'lucide-react';
 import { convertPdfToWord, downloadWordFile, isPdfFile, testDocxLibrary } from '../utils/pdfToWordConverter';
-import { createTemplateFromPdf } from '../utils/pdfToTemplate';
 import { extractTemplateContent } from '../utils/pdfMerger';
 import { formatCurrency } from '../utils/pricing';
+import { templateService } from '../utils/templateService';
 
 interface Template {
   id: string;
@@ -130,24 +130,68 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
     }
   ];
 
-  // Load templates from localStorage on component mount
+  // Load templates from database on component mount
   useEffect(() => {
     const loadTemplates = async () => {
-      const savedTemplates = localStorage.getItem('cpq_templates');
-      if (savedTemplates) {
-        try {
-          const parsedTemplates = JSON.parse(savedTemplates);
-          // Convert base64 strings back to File objects
-          const templatesWithFiles = parsedTemplates.map((template: any) => ({
-            ...template,
-            file: template.fileData ? dataURLtoFile(template.fileData, template.fileName) : null,
-            wordFile: template.wordFileData ? dataURLtoFile(template.wordFileData, template.wordFileName) : null,
-            uploadDate: new Date(template.uploadDate),
-            content: template.content || null // Restore the extracted content
-          }));
-          setTemplates(templatesWithFiles);
-        } catch (error) {
-          console.error('Error loading templates:', error);
+      console.log('🔄 TemplateManager: Loading templates from database...');
+      try {
+        // Try to load from database first
+        const dbTemplates = await templateService.getTemplates();
+        console.log('📋 TemplateManager: Found templates in database:', dbTemplates.length);
+        
+        if (dbTemplates.length > 0) {
+          // Convert database templates to frontend format
+          const frontendTemplates = await templateService.convertToFrontendTemplates(dbTemplates);
+          console.log('✅ TemplateManager: Templates loaded from database:', frontendTemplates.length);
+          setTemplates(frontendTemplates);
+        } else {
+          // Fallback to localStorage if no database templates
+          console.log('📋 TemplateManager: No database templates, checking localStorage...');
+          const savedTemplates = localStorage.getItem('cpq_templates');
+          if (savedTemplates) {
+            try {
+              const parsedTemplates = JSON.parse(savedTemplates);
+              console.log('📋 TemplateManager: Found saved templates in localStorage:', parsedTemplates.length);
+              
+              // Convert base64 strings back to File objects
+              const templatesWithFiles = parsedTemplates.map((template: any) => ({
+                ...template,
+                file: template.fileData ? dataURLtoFile(template.fileData, template.fileName) : null,
+                wordFile: template.wordFileData ? dataURLtoFile(template.wordFileData, template.wordFileName) : null,
+                uploadDate: new Date(template.uploadDate),
+                content: template.content || null
+              }));
+              
+              console.log('✅ TemplateManager: Templates loaded from localStorage:', templatesWithFiles.length);
+              setTemplates(templatesWithFiles);
+            } catch (error) {
+              console.error('❌ TemplateManager: Error loading templates from localStorage:', error);
+            }
+          } else {
+            console.log('📋 TemplateManager: No templates found in localStorage either');
+          }
+        }
+      } catch (error) {
+        console.error('❌ TemplateManager: Error loading templates from database:', error);
+        // Fallback to localStorage on database error
+        console.log('📋 TemplateManager: Falling back to localStorage...');
+        const savedTemplates = localStorage.getItem('cpq_templates');
+        if (savedTemplates) {
+          try {
+            const parsedTemplates = JSON.parse(savedTemplates);
+            const templatesWithFiles = parsedTemplates.map((template: any) => ({
+              ...template,
+              file: template.fileData ? dataURLtoFile(template.fileData, template.fileName) : null,
+              wordFile: template.wordFileData ? dataURLtoFile(template.wordFileData, template.wordFileName) : null,
+              uploadDate: new Date(template.uploadDate),
+              content: template.content || null
+            }));
+            
+            setTemplates(templatesWithFiles);
+            console.log('✅ TemplateManager: Templates loaded from localStorage fallback:', templatesWithFiles.length);
+          } catch (localError) {
+            console.error('❌ TemplateManager: Error loading templates from localStorage fallback:', localError);
+          }
         }
       }
       setIsLoading(false);
@@ -363,20 +407,33 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
     setIsUploading(true);
 
     try {
-      // Extract content from the uploaded template
+      console.log('📄 Uploading template to database...');
+      
+      // Upload template to database
+      const uploadResult = await templateService.uploadTemplate(
+        newTemplate.file,
+        newTemplate.name.trim(),
+        newTemplate.description.trim(),
+        templates.length === 0 // First template becomes default
+      );
+
+      console.log('✅ Template uploaded to database:', uploadResult.template.id);
+
+      // Extract content from the uploaded template for local processing
       console.log('📄 Extracting content from uploaded template...');
       const extractedContent = await extractTemplateContent(newTemplate.file);
       console.log('✅ Template content extracted:', extractedContent.substring(0, 100) + '...');
 
+      // Create frontend template object
       const template: Template = {
-        id: Date.now().toString(),
-        name: newTemplate.name.trim(),
-        description: newTemplate.description.trim(),
+        id: uploadResult.template.id,
+        name: uploadResult.template.name,
+        description: uploadResult.template.description || '',
         file: newTemplate.file,
         wordFile: newTemplate.wordFile,
         size: formatFileSize(newTemplate.file.size),
-        uploadDate: new Date(),
-        isDefault: templates.length === 0, // First template becomes default
+        uploadDate: new Date(uploadResult.template.createdAt),
+        isDefault: uploadResult.template.isDefault,
         content: extractedContent // Store the extracted content
       };
 
@@ -385,10 +442,10 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
       setTemplates(updatedTemplates);
       
       // Reset form
-      setNewTemplate({ name: '', description: '', file: null, wordFile: null });
+      setNewTemplate({ name: '', description: '', file: null, wordFile: undefined });
       setShowUploadModal(false);
       setUploadError(null);
-      setUploadSuccess('Template uploaded successfully!');
+      setUploadSuccess('Template uploaded successfully to database!');
 
       // Clear success message after 3 seconds
       setTimeout(() => {
@@ -400,61 +457,83 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
         onTemplateSelect(template);
       }
 
-      // Save to localStorage immediately with error handling
+      // Also save to localStorage as backup
       try {
-      const templatesForStorage = await Promise.all(updatedTemplates.map(async (t) => ({
-        ...t,
-        fileData: t.file ? await fileToDataURL(t.file) : null,
-        fileName: t.file ? t.file.name : null,
-        wordFileData: t.wordFile ? await fileToDataURL(t.wordFile) : null,
-        wordFileName: t.wordFile ? t.wordFile.name : null,
-        content: t.content, // Include the extracted content
-        file: undefined,
-        wordFile: undefined
-      })));
-      
-      localStorage.setItem('cpq_templates', JSON.stringify(templatesForStorage));
-      } catch (storageError) {
-        console.warn('⚠️ Could not save file data to localStorage, saving without file data');
-        // Save without file data to avoid storage issues
-        const templatesForStorage = updatedTemplates.map(t => ({
+        const templatesForStorage = await Promise.all(updatedTemplates.map(async (t) => ({
           ...t,
-          fileData: null,
+          fileData: t.file ? await fileToDataURL(t.file) : null,
           fileName: t.file ? t.file.name : null,
-          wordFileData: null,
+          wordFileData: t.wordFile ? await fileToDataURL(t.wordFile) : null,
           wordFileName: t.wordFile ? t.wordFile.name : null,
           content: t.content,
           file: undefined,
           wordFile: undefined
-        }));
+        })));
         
         localStorage.setItem('cpq_templates', JSON.stringify(templatesForStorage));
+        console.log('✅ Template also saved to localStorage as backup');
+      } catch (storageError) {
+        console.warn('⚠️ Could not save to localStorage backup:', storageError);
       }
       
     } catch (error) {
-      console.error('Error uploading template:', error);
-      setUploadError('Failed to upload template. Please try again.');
+      console.error('❌ Error uploading template:', error);
+      setUploadError(`Failed to upload template: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleDeleteTemplate = (templateId: string) => {
+  const handleDeleteTemplate = async (templateId: string) => {
     if (window.confirm('Are you sure you want to delete this template?')) {
-      setTemplates(prev => prev.filter(t => t.id !== templateId));
-      
-      // If deleted template was selected, clear selection
-      if (selectedTemplate?.id === templateId && onTemplateSelect) {
-        onTemplateSelect(null as any);
+      try {
+        console.log('🗑️ Deleting template from database:', templateId);
+        
+        // Delete from database
+        await templateService.deleteTemplate(templateId);
+        
+        // Remove from state
+        setTemplates(prev => prev.filter(t => t.id !== templateId));
+        
+        // If deleted template was selected, clear selection
+        if (selectedTemplate?.id === templateId && onTemplateSelect) {
+          onTemplateSelect(null as any);
+        }
+        
+        console.log('✅ Template deleted successfully from database');
+        setUploadSuccess('Template deleted successfully!');
+        setTimeout(() => setUploadSuccess(null), 3000);
+        
+      } catch (error) {
+        console.error('❌ Error deleting template:', error);
+        setUploadError(`Failed to delete template: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        setTimeout(() => setUploadError(null), 5000);
       }
     }
   };
 
-  const handleSetDefault = (templateId: string) => {
-    setTemplates(prev => prev.map(t => ({
-      ...t,
-      isDefault: t.id === templateId
-    })));
+  const handleSetDefault = async (templateId: string) => {
+    try {
+      console.log('📝 Setting default template in database:', templateId);
+      
+      // Update in database
+      await templateService.updateTemplate(templateId, { isDefault: true });
+      
+      // Update state
+      setTemplates(prev => prev.map(t => ({
+        ...t,
+        isDefault: t.id === templateId
+      })));
+      
+      console.log('✅ Default template updated in database');
+      setUploadSuccess('Default template updated successfully!');
+      setTimeout(() => setUploadSuccess(null), 3000);
+      
+    } catch (error) {
+      console.error('❌ Error updating default template:', error);
+      setUploadError(`Failed to update default template: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setTimeout(() => setUploadError(null), 5000);
+    }
   };
 
   // Process template content for non-PDF templates

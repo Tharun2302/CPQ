@@ -1870,6 +1870,272 @@ app.get('/api/pricing-tiers', async (req, res) => {
   }
 });
 
+// Template Management API Endpoints
+
+// Upload template to database
+app.post('/api/templates', upload.single('template'), async (req, res) => {
+  try {
+    console.log('📄 Template upload request received');
+    
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No template file provided' 
+      });
+    }
+
+    const { name, description, isDefault } = req.body;
+    const file = req.file;
+    
+    // Generate unique ID for template
+    const templateId = `template-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    
+    // Determine file type
+    const fileType = file.originalname.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf';
+    
+    console.log('📄 Processing template:', {
+      id: templateId,
+      name: name || file.originalname,
+      fileName: file.originalname,
+      fileType,
+      fileSize: file.size
+    });
+
+    const connection = await pool.getConnection();
+    
+    try {
+      // Insert template into database
+      const [result] = await connection.execute(
+        `INSERT INTO templates (id, name, description, file_name, file_type, file_data, file_size, is_default) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          templateId,
+          name || file.originalname,
+          description || null,
+          file.originalname,
+          fileType,
+          file.buffer,
+          file.size,
+          isDefault === 'true' || false
+        ]
+      );
+
+      console.log('✅ Template saved to database:', templateId);
+      
+      res.json({
+        success: true,
+        message: 'Template uploaded successfully',
+        template: {
+          id: templateId,
+          name: name || file.originalname,
+          description: description || null,
+          fileName: file.originalname,
+          fileType,
+          fileSize: file.size,
+          isDefault: isDefault === 'true' || false,
+          createdAt: new Date().toISOString()
+        }
+      });
+      
+    } finally {
+      connection.release();
+    }
+    
+  } catch (error) {
+    console.error('❌ Error uploading template:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to upload template',
+      details: error.message 
+    });
+  }
+});
+
+// Get all templates from database
+app.get('/api/templates', async (req, res) => {
+  try {
+    console.log('📄 Fetching templates from database...');
+    
+    const connection = await pool.getConnection();
+    
+    try {
+      const [rows] = await connection.execute(
+        `SELECT id, name, description, file_name, file_type, file_size, is_default, created_at, updated_at 
+         FROM templates 
+         ORDER BY created_at DESC`
+      );
+
+      console.log(`✅ Found ${rows.length} templates in database`);
+      
+      const templates = rows.map(row => ({
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        fileName: row.file_name,
+        fileType: row.file_type,
+        fileSize: row.file_size,
+        isDefault: row.is_default,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }));
+
+      res.json({
+        success: true,
+        templates,
+        count: templates.length
+      });
+      
+    } finally {
+      connection.release();
+    }
+    
+  } catch (error) {
+    console.error('❌ Error fetching templates:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch templates',
+      details: error.message 
+    });
+  }
+});
+
+// Get specific template file from database
+app.get('/api/templates/:id/file', async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('📄 Fetching template file:', id);
+    
+    const connection = await pool.getConnection();
+    
+    try {
+      const [rows] = await connection.execute(
+        `SELECT file_name, file_type, file_data FROM templates WHERE id = ?`,
+        [id]
+      );
+
+      if (rows.length === 0) {
+        return res.status(404).json({ 
+          success: false, 
+          error: 'Template not found' 
+        });
+      }
+
+      const template = rows[0];
+      
+      // Set appropriate headers for file download
+      res.setHeader('Content-Type', template.file_type === 'docx' ? 
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 
+        'application/pdf'
+      );
+      res.setHeader('Content-Disposition', `attachment; filename="${template.file_name}"`);
+      res.setHeader('Content-Length', template.file_data.length);
+      
+      // Send file data
+      res.send(template.file_data);
+      
+      console.log('✅ Template file sent:', template.file_name);
+      
+    } finally {
+      connection.release();
+    }
+    
+  } catch (error) {
+    console.error('❌ Error fetching template file:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch template file',
+      details: error.message 
+    });
+  }
+});
+
+// Delete template from database
+app.delete('/api/templates/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('🗑️ Deleting template:', id);
+    
+    const connection = await pool.getConnection();
+    
+    try {
+      const [result] = await connection.execute(
+        `DELETE FROM templates WHERE id = ?`,
+        [id]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ 
+          success: false, 
+          error: 'Template not found' 
+        });
+      }
+
+      console.log('✅ Template deleted from database:', id);
+      
+      res.json({
+        success: true,
+        message: 'Template deleted successfully'
+      });
+      
+    } finally {
+      connection.release();
+    }
+    
+  } catch (error) {
+    console.error('❌ Error deleting template:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to delete template',
+      details: error.message 
+    });
+  }
+});
+
+// Update template metadata (name, description, isDefault)
+app.put('/api/templates/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, isDefault } = req.body;
+    console.log('📝 Updating template metadata:', id);
+    
+    const connection = await pool.getConnection();
+    
+    try {
+      const [result] = await connection.execute(
+        `UPDATE templates 
+         SET name = ?, description = ?, is_default = ?, updated_at = CURRENT_TIMESTAMP 
+         WHERE id = ?`,
+        [name, description, isDefault === 'true' || false, id]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ 
+          success: false, 
+          error: 'Template not found' 
+        });
+      }
+
+      console.log('✅ Template metadata updated:', id);
+      
+      res.json({
+        success: true,
+        message: 'Template updated successfully'
+      });
+      
+    } finally {
+      connection.release();
+    }
+    
+  } catch (error) {
+    console.error('❌ Error updating template:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to update template',
+      details: error.message 
+    });
+  }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ 
@@ -1879,7 +2145,8 @@ app.get('/api/health', (req, res) => {
     services: {
       database: 'available',
       hubspot: 'available',
-      email: 'available'
+      email: 'available',
+      templates: 'available'
     }
   });
 });
@@ -1900,6 +2167,11 @@ app.listen(PORT, () => {
   console.log(`   - GET  /api/hubspot/companies`);
   console.log(`   - POST /api/email/send`);
   console.log(`   - GET  /api/email/test`);
+  console.log(`   - POST /api/templates`);
+  console.log(`   - GET  /api/templates`);
+  console.log(`   - GET  /api/templates/:id/file`);
+  console.log(`   - PUT  /api/templates/:id`);
+  console.log(`   - DELETE /api/templates/:id`);
       console.log(`   - POST /api/signature/create-form`);
     console.log(`   - POST /api/signature/track-interaction`);
     console.log(`   - POST /api/signature/submit`);
