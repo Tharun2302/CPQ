@@ -43,6 +43,8 @@ const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh, onUseDea
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   console.log('🔍 DealDetails render - dealData:', dealData);
+  console.log('🔍 Company By Contact value:', dealData?.companyByContact);
+  console.log('🔍 Company By Contact exists?', !!dealData?.companyByContact);
 
   if (!dealData) {
     return (
@@ -260,14 +262,14 @@ const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh, onUseDea
             )}
 
             {/* Company Name (2) */}
-            {dealData.companyByContact && (
+            {(dealData.companyByContact || true) && (
               <div className="flex items-center p-4 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl border border-amber-100">
                 <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center mr-4">
                   <Building className="w-5 h-5 text-amber-600" />
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 font-medium">Company Name (2)</p>
-                  <p className="font-semibold text-gray-900 text-lg">{dealData.companyByContact}</p>
+                  <p className="font-semibold text-gray-900 text-lg">{dealData.companyByContact || 'Not Available'}</p>
                 </div>
               </div>
             )}
