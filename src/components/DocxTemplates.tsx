@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import { Upload, Download, AlertCircle, CheckCircle, Loader2, FileText } from 'lucide-react';
-import { DocxProcessingResult, DocxTemplateData } from '../types';
+import { Upload, Download, CheckCircle, Loader2, FileText } from 'lucide-react';
+import { DocxProcessingResult } from '../types';
 import { DocxValidator } from '../utils/helpers';
-import { docxTemplateProcessor } from '../utils/docxTemplateProcessor';
+import { docxTemplateProcessor, DocxTemplateData } from '../utils/docxTemplateProcessor';
 
 interface DocxTemplatesProps {
   quoteData: any;
