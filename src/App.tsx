@@ -1221,6 +1221,7 @@ function App() {
                 ownerId: "user-456",
                 // Add demo contact and company information
                 company: "Demo Company Inc.",
+                companyByContact: "Contact Company Inc.",
                 contactName: "John Smith",
                 contactEmail: "john.smith@democompany.com",
                 contactPhone: "+1 (555) 123-4567",

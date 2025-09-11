@@ -22,6 +22,7 @@ interface DealData {
   stage?: string;
   ownerId?: string;
   company?: string;
+  companyByContact?: string;
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
@@ -254,6 +255,19 @@ const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh, onUseDea
                 <div>
                   <p className="text-sm text-gray-500 font-medium">Contact Email</p>
                   <p className="font-semibold text-gray-900 text-lg">{dealData.contactEmail}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Company Name (2) */}
+            {dealData.companyByContact && (
+              <div className="flex items-center p-4 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl border border-amber-100">
+                <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center mr-4">
+                  <Building className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">Company Name (2)</p>
+                  <p className="font-semibold text-gray-900 text-lg">{dealData.companyByContact}</p>
                 </div>
               </div>
             )}

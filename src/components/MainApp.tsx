@@ -320,8 +320,6 @@ export const MainApp: React.FC = () => {
                     onChange={(e) => setConfiguration(prev => ({ ...prev, migrationType: e.target.value as any }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    <option value="Content">Content</option>
-                    <option value="Email">Email</option>
                     <option value="Messaging">Messaging</option>
                   </select>
                 </div>

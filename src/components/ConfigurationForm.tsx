@@ -10,6 +10,7 @@ interface DealData {
   stage?: string;
   ownerId?: string;
   company?: string;
+  companyByContact?: string;
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
@@ -60,7 +61,8 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
   const [contactInfo, setContactInfo] = useState({
     clientName: '',
     clientEmail: '',
-    company: ''
+    company: '',
+    companyName2: ''
   });
 
   // Initialize contact info from deal data
@@ -69,7 +71,8 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
       const initialContactInfo = {
         clientName: dealData.contactName || '',
         clientEmail: dealData.contactEmail || '',
-        company: dealData.company || ''
+        company: dealData.company || '',
+        companyName2: dealData.companyByContact || ''
       };
       console.log('🔍 ConfigurationForm: Initializing contact info from deal data:', initialContactInfo);
       setContactInfo(initialContactInfo);
@@ -212,6 +215,18 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
                   placeholder="Enter company name"
                 />
               </div>
+              
+              {/* Company Name (2) */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Company Name (2)</label>
+                <input
+                  type="text"
+                  value={contactInfo.companyName2}
+                  onChange={(e) => handleContactChange('companyName2', e.target.value)}
+                  className="w-full px-4 py-3 bg-white border-2 border-green-200 rounded-lg text-gray-800 font-medium focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-100 transition-colors"
+                  placeholder="Enter company name by contact"
+                />
+              </div>
             </div>
             
             <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
@@ -243,12 +258,10 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
               </label>
               <select
                 value={config.migrationType}
-                onChange={(e) => handleChange('migrationType', e.target.value as 'Content' | 'Email' | 'Messaging')}
+                onChange={(e) => handleChange('migrationType', e.target.value as 'Messaging')}
                 className="w-full px-6 py-4 border-2 border-teal-200 rounded-xl focus:ring-4 focus:ring-teal-500/20 focus:border-teal-500 transition-all duration-300 bg-white/90 backdrop-blur-sm hover:border-teal-300 text-lg font-medium"
               >
                 <option value="">Select Migration Type</option>
-                <option value="Content">Content</option>
-                <option value="Email">Email</option>
                 <option value="Messaging">Messaging</option>
               </select>
             </div>
@@ -279,6 +292,19 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
                     if (onTemplateSelect) {
                       onTemplateSelect(template);
                     }
+                    
+                    // Auto-scroll to Project Configuration section when template is selected
+                    if (template) {
+                      setTimeout(() => {
+                        const projectConfigSection = document.querySelector('[data-section="project-configuration"]');
+                        if (projectConfigSection) {
+                          projectConfigSection.scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'start' 
+                          });
+                        }
+                      }, 100); // Small delay to ensure DOM is updated
+                    }
                   }}
                   className="w-full px-6 py-4 border-2 border-purple-200 rounded-xl focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 bg-white/90 backdrop-blur-sm hover:border-purple-300 text-lg font-medium"
                 >
@@ -305,8 +331,8 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
           )}
 
           {/* Other Configuration Fields - Conditional Rendering */}
-          {config.migrationType && (
-            <div className="bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/50 rounded-2xl shadow-2xl border border-blue-100/50 p-8 backdrop-blur-sm">
+          {config.migrationType && selectedTemplate && (
+            <div data-section="project-configuration" className="bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/50 rounded-2xl shadow-2xl border border-blue-100/50 p-8 backdrop-blur-sm">
               <div className="text-center mb-8">
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">Project Configuration</h3>
                 <p className="text-gray-600">Configure your {config.migrationType.toLowerCase()} migration requirements</p>
@@ -410,8 +436,8 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
             </div>
           )}
 
-          {/* Calculate Pricing Button - Only show when migration type is selected */}
-          {config.migrationType && (
+          {/* Calculate Pricing Button - Only show when migration type and template are selected */}
+          {config.migrationType && selectedTemplate && (
             <button
               type="submit"
               className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white py-5 px-8 rounded-2xl font-bold text-lg hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl shadow-xl relative overflow-hidden group"

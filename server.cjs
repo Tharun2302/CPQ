@@ -2137,6 +2137,64 @@ app.put('/api/templates/:id', async (req, res) => {
 });
 
 // Health check endpoint
+// Root route for deal information display
+app.get('/', (req, res) => {
+  // Deal Information
+  const dealId = req.query.dealId;
+  const dealName = req.query.dealName;
+  const amount = req.query.amount;
+  const closeDate = req.query.closeDate;
+  const stage = req.query.stage;
+  const ownerId = req.query.ownerId;
+  
+  // Contact Information (from fetched_objects.fetched_object_176195683)
+  const contactEmail = req.query.ContactEmail;
+  const contactFirstName = req.query.ContactFirstName;
+  const contactLastName = req.query.ContactLastName;
+  
+  // Company Information (from fetched_objects.fetched_object_176195685)
+  const companyName = req.query.CompanyName;
+  const companyByContact = req.query.CompanyByContact;
+  
+  // Log all the captured data
+  console.log({
+    deal: {
+      dealId,
+      dealName,
+      amount,
+      closeDate,
+      stage,
+      ownerId
+    },
+    contact: {
+      email: contactEmail,
+      firstName: contactFirstName,
+      lastName: contactLastName
+    },
+    company: {
+      name: companyName,
+      byContact: companyByContact
+    }
+  });
+  
+  // Create a more comprehensive response
+  const fullContactName = `${contactFirstName} ${contactLastName}`.trim();
+  res.send(`
+<h2>Deal Information</h2>
+<p><strong>Deal:</strong> ${dealName} (ID: ${dealId})</p>
+<p><strong>Amount:</strong> ${amount}</p>
+<p><strong>Stage:</strong> ${stage || 'N/A'}</p>
+<p><strong>Close Date:</strong> ${closeDate || 'N/A'}</p>
+<p><strong>Owner ID:</strong> ${ownerId || 'N/A'}</p>
+<h2>Contact Information</h2>
+<p><strong>Name:</strong> ${fullContactName}</p>
+<p><strong>Email:</strong> ${contactEmail}</p>
+<h2>Company Information</h2>
+<p><strong>Company:</strong> ${companyName}</p>
+<p><strong>Company by Contact:</strong> ${companyByContact || companyName}</p>
+  `);
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ 
     success: true,
@@ -2157,6 +2215,7 @@ app.listen(PORT, () => {
   console.log(`📧 Email service configured for: ${EMAIL_CONFIG.auth.user}`);
   console.log(`🔗 HubSpot API: ${HUBSPOT_API_KEY === 'demo-key' ? 'DEMO MODE' : 'CONNECTED'}`);
   console.log(`🌐 API endpoints:`);
+      console.log(`   - GET  / (Deal Information Display)`);
       console.log(`   - GET  /api/health`);
       console.log(`   - GET  /api/database/health`);
       console.log(`   - GET  /api/quotes`);
