@@ -307,6 +307,7 @@ function App() {
     
     // Company Information (from fetched_objects.fetched_object_176195685)
     const companyName = urlParams.get('CompanyName');
+    const companyByContact = urlParams.get('CompanyByContact') || urlParams.get('CompanyFromContact');
     
     // Additional HubSpot parameters (if available)
     const dealAmount = urlParams.get('deal.amount');
@@ -330,6 +331,7 @@ function App() {
       contactLastName,
       // Company Information (from HubSpot)
       companyName,
+      companyByContact,
       // Additional HubSpot parameters
       dealAmount,
       contactEmailBDM,
@@ -350,6 +352,7 @@ function App() {
         ownerId: ownerId || 'Not Set',
         // Contact Information from HubSpot
         company: companyName || 'Not Available',
+        companyByContact: companyByContact || 'Not Available',
         contactName: contactFirstName && contactLastName ? `${contactFirstName} ${contactLastName}`.trim() : 'Contact from HubSpot',
         contactEmail: contactEmail || 'email@hubspot.com',
         contactPhone: contactPhone || '+1 (555) 123-4567',

@@ -2154,7 +2154,7 @@ app.get('/', (req, res) => {
   
   // Company Information (from fetched_objects.fetched_object_176195685)
   const companyName = req.query.CompanyName;
-  const companyByContact = req.query.CompanyByContact;
+  const companyByContact = req.query.CompanyByContact || req.query.CompanyFromContact;
   
   // Log all the captured data
   console.log({
