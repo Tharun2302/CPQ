@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { validateSignInForm, getFieldError } from '../../utils/validation';
 import { AuthError } from '../../types/auth';
@@ -68,8 +69,12 @@ const SignInForm: React.FC<SignInFormProps> = ({ onSuccess, onError }) => {
     <div className="w-full max-w-md mx-auto">
       <div className="bg-white shadow-lg rounded-lg p-8">
         <div className="text-center mb-6">
+          <div className="mb-4">
+            <span className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm sm:text-base font-bold px-4 sm:px-6 py-2 sm:py-3 rounded-full shadow-lg transform hover:scale-105 transition-all duration-300 text-center max-w-full">
+              ✨ Welcome to CloudFuze CPQ Quote ✨
+            </span>
+          </div>
           <h2 className="text-2xl font-bold text-gray-900">Sign In</h2>
-          <p className="text-gray-600 mt-2">Welcome back to CPQ Pro</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -141,12 +146,22 @@ const SignInForm: React.FC<SignInFormProps> = ({ onSuccess, onError }) => {
           </button>
         </form>
 
+        {/* Sign Up Link */}
+        <div className="text-center mt-6">
+          <p className="text-sm text-gray-600">
+            Don't have an account?{' '}
+            <Link to="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
+              Sign up
+            </Link>
+          </p>
+        </div>
+
         {/* Demo Credentials */}
         <div className="mt-6 p-4 bg-gray-50 rounded-md">
           <p className="text-sm text-gray-600 mb-2">Demo Credentials:</p>
           <div className="text-xs text-gray-500 space-y-1">
-            <p>Email: john@example.com</p>
-            <p>Password: password123</p>
+            <p>Email: raya@gmail.com</p>
+            <p>Password: raya123</p>
           </div>
         </div>
       </div>

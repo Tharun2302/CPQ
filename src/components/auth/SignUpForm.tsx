@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { validateSignUpForm, getFieldError } from '../../utils/validation';
 import { AuthError } from '../../types/auth';
@@ -78,8 +79,12 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, onError }) => {
     <div className="w-full max-w-md mx-auto">
       <div className="bg-white shadow-lg rounded-lg p-8">
         <div className="text-center mb-6">
+          <div className="mb-4">
+            <span className="inline-block bg-gradient-to-r from-green-600 to-emerald-600 text-white text-sm sm:text-base font-bold px-4 sm:px-6 py-2 sm:py-3 rounded-full shadow-lg transform hover:scale-105 transition-all duration-300 text-center max-w-full">
+              ✨ Welcome to CloudFuze CPQ Quote ✨
+            </span>
+          </div>
           <h2 className="text-2xl font-bold text-gray-900">Sign Up</h2>
-          <p className="text-gray-600 mt-2">Create your CPQ Pro account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -197,6 +202,16 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, onError }) => {
             )}
           </button>
         </form>
+
+        {/* Sign In Link */}
+        <div className="text-center mt-6">
+          <p className="text-sm text-gray-600">
+            Already have an account?{' '}
+            <Link to="/signin" className="text-green-600 hover:text-green-700 font-medium">
+              Sign in
+            </Link>
+          </p>
+        </div>
 
         {/* Terms and Privacy */}
         <div className="mt-6 text-center">

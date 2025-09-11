@@ -8,22 +8,22 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const mockUsers: User[] = [
   {
     id: 'user_1',
-    name: 'John Doe',
-    email: 'john@example.com',
+    name: 'raya',
+    email: 'raya@gmail.com',
     createdAt: '2024-01-01T00:00:00Z'
   },
   {
     id: 'user_2',
-    name: 'Jane Smith',
-    email: 'jane@example.com',
+    name: 'tharun',
+    email: 'tharun@gmail.com',
     createdAt: '2024-01-02T00:00:00Z'
   }
 ];
 
 // Mock passwords (in a real app, these would be hashed)
 const mockPasswords: { [key: string]: string } = {
-  'john@example.com': 'password123',
-  'jane@example.com': 'password456'
+  'raya@gmail.com': 'raya123',
+  'tharun@gmail.com': 'tharun123'
 };
 
 interface AuthProviderProps {

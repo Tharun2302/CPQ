@@ -16,23 +16,6 @@ const SignInPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <Link to="/" className="flex items-center">
-              <Calculator className="h-8 w-8 text-blue-600 mr-2" />
-              <span className="text-2xl font-bold text-gray-900">CloudFuze CPQ Quote</span>
-            </Link>
-            <div className="text-sm text-gray-600">
-              Don't have an account?{' '}
-              <Link to="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
-                Sign up
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
 
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -45,7 +28,7 @@ const SignInPage: React.FC = () => {
       <footer className="bg-white border-t py-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-sm text-gray-500">
-            © 2024 CPQ Pro. All rights reserved.
+            © 2025 CloudFuze CPQ Quote. All rights reserved.
           </p>
         </div>
       </footer>

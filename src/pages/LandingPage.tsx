@@ -5,40 +5,16 @@ import { Calculator, Users, FileText, BarChart3, Shield, Zap } from 'lucide-reac
 const LandingPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <Calculator className="h-8 w-8 text-blue-600 mr-2" />
-              <span className="text-2xl font-bold text-gray-900">CloudFuze CPQ Quote</span>
-            </div>
-            <div className="flex space-x-4">
-              <Link
-                to="/signin"
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Sign In
-              </Link>
-              <Link
-                to="/signup"
-                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
-              >
-                Sign Up
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
 
       {/* Hero Section */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center">
-          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-            CloudFuze CPQ Quote
-            <span className="block text-blue-600">Configure, Price, Quote Made Simple</span>
-          </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+          <div className="mb-8">
+            <span className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white text-lg font-bold px-8 py-3 rounded-full shadow-lg transform hover:scale-105 transition-all duration-300">
+              ✨ Welcome to CloudFuze CPQ Quote ✨
+            </span>
+          </div>
+          <p className="text-xl text-gray-600 mb-8 max-w-4xl mx-auto leading-relaxed">
             Streamline your sales process with CloudFuze's powerful CPQ solution. 
             Generate accurate quotes, manage templates, and integrate with HubSpot 
             to close more deals faster.
@@ -121,7 +97,7 @@ const LandingPage: React.FC = () => {
             Ready to transform your sales process?
           </h2>
           <p className="text-xl text-blue-100 mb-8">
-            Join thousands of sales teams already using CPQ Pro to close more deals.
+            Trusted by leading companies worldwide to streamline their quoting process.
           </p>
           <Link
             to="/signup"
