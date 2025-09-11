@@ -74,6 +74,25 @@ async function initializeDatabase() {
       )
     `);
     
+    // Create templates table if it doesn't exist
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS templates (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        file_name VARCHAR(255) NOT NULL,
+        file_type VARCHAR(50) NOT NULL,
+        file_data LONGBLOB NOT NULL,
+        file_size INT NOT NULL,
+        is_default BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_file_type (file_type),
+        INDEX idx_is_default (is_default),
+        INDEX idx_created_at (created_at)
+      )
+    `);
+    
     console.log('✅ Database tables initialized successfully');
     return true;
   } catch (error) {

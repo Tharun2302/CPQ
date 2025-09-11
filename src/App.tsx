@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
 import Navigation from './components/Navigation';
 import ConfigurationForm from './components/ConfigurationForm';
 import PricingComparison from './components/PricingComparison';
@@ -16,6 +18,12 @@ import DigitalSignatureForm from './components/DigitalSignatureForm';
 import { ConfigurationData, PricingCalculation, PricingTier, Quote } from './types/pricing';
 import { calculateAllTiers, getRecommendedTier, PRICING_TIERS } from './utils/pricing';
 import { FileText } from 'lucide-react';
+
+// Import authentication page components
+import LandingPage from './pages/LandingPage';
+import SignInPage from './pages/SignInPage';
+import SignUpPage from './pages/SignUpPage';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 
 function App() {
   const [activeTab, setActiveTab] = useState('configure');
@@ -1510,14 +1518,33 @@ function App() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/50 to-indigo-100/50">
-      {!isSignatureForm && <Navigation activeTab={activeTab} onTabChange={setActiveTab} />}
-      
-      <main className={`${isSignatureForm ? 'max-w-6xl' : 'max-w-7xl'} mx-auto px-4 sm:px-6 lg:px-8 py-10`}>
-        {renderContent()}
-      </main>
-    </div>
+   return (
+    <Router>
+      <AuthProvider>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/signin" element={<SignInPage />} />
+          <Route path="/signup" element={<SignUpPage />} />
+          
+          {/* Protected Routes - Original CPQ App */}
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/50 to-indigo-100/50">
+                {!isSignatureForm && <Navigation activeTab={activeTab} onTabChange={setActiveTab} />}
+                
+                <main className={`${isSignatureForm ? 'max-w-6xl' : 'max-w-7xl'} mx-auto px-4 sm:px-6 lg:px-8 py-10`}>
+                  {renderContent()}
+                </main>
+              </div>
+            </ProtectedRoute>
+          } />
+          
+          {/* Redirect any other routes to landing page */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </Router>
   );
 }
 

@@ -1,5 +1,7 @@
 import React from 'react';
 import { Calculator, FileText, Settings, BarChart3, Sparkles, DollarSign, MessageSquare, Upload, Building } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import UserMenu from './auth/UserMenu';
 
 interface NavigationProps {
   activeTab: string;
@@ -7,6 +9,8 @@ interface NavigationProps {
 }
 
 const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
+  const { isAuthenticated } = useAuth();
+  
   const tabs = [
     { id: 'deal', label: 'Deal', icon: Building },
     { id: 'configure', label: 'Configure', icon: Calculator },
@@ -39,24 +43,32 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
             </div>
           </div>
 
-          <div className="flex space-x-2">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => onTabChange(tab.id)}
-                  className={`flex items-center gap-3 px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 ${
-                    activeTab === tab.id
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
-                      : 'text-gray-700 hover:text-gray-900 hover:bg-white/60 hover:shadow-md'
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="font-semibold">{tab.label}</span>
-                </button>
-              );
-            })}
+          <div className="flex items-center space-x-4">
+            {/* Navigation Tabs - Only show if authenticated */}
+            {isAuthenticated && (
+              <div className="flex space-x-2">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => onTabChange(tab.id)}
+                      className={`flex items-center gap-3 px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 ${
+                        activeTab === tab.id
+                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
+                          : 'text-gray-700 hover:text-gray-900 hover:bg-white/60 hover:shadow-md'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span className="font-semibold">{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            
+            {/* User Menu - Only show if authenticated */}
+            {isAuthenticated && <UserMenu />}
           </div>
         </div>
       </div>

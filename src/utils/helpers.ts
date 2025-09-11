@@ -617,18 +617,4 @@ export class ErrorHandler {
   }
 }
 
-// Export all utilities
-export {
-  formatCurrency,
-  generateQuoteId,
-  findPricingRegion,
-  findPricingPageIndex,
-  overlayCenterCell,
-  replaceIntroLine,
-  LocalStorageHelper,
-  PDFValidator,
-  DocxValidator,
-  FormValidator,
-  PerformanceMonitor,
-  ErrorHandler
-};
+// All utilities are already exported individually above
