@@ -79,8 +79,14 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
       
       // Notify parent component of initial contact info
       if (onContactInfoChange) {
-        console.log('✅ ConfigurationForm: Notifying parent of initial contact info:', initialContactInfo);
-        onContactInfoChange(initialContactInfo);
+        // Map the internal structure to the expected parent structure
+        const parentContactInfo = {
+          clientName: initialContactInfo.clientName,
+          clientEmail: initialContactInfo.clientEmail,
+          company: initialContactInfo.companyName2 // Map companyName2 to company for parent
+        };
+        console.log('✅ ConfigurationForm: Notifying parent of initial contact info:', parentContactInfo);
+        onContactInfoChange(parentContactInfo);
       } else {
         console.log('⚠️ ConfigurationForm: No onContactInfoChange callback available for initial contact info');
       }
@@ -117,8 +123,14 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
     
     // Notify parent component of contact info changes
     if (onContactInfoChange) {
-      console.log('✅ ConfigurationForm: Notifying parent of contact info change:', newContactInfo);
-      onContactInfoChange(newContactInfo);
+      // Map the internal structure to the expected parent structure
+      const parentContactInfo = {
+        clientName: newContactInfo.clientName,
+        clientEmail: newContactInfo.clientEmail,
+        company: newContactInfo.companyName2 // Map companyName2 to company for parent
+      };
+      console.log('✅ ConfigurationForm: Notifying parent of contact info change:', parentContactInfo);
+      onContactInfoChange(parentContactInfo);
     } else {
       console.log('⚠️ ConfigurationForm: No onContactInfoChange callback available');
     }
@@ -204,21 +216,9 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
                 />
               </div>
               
-              {/* Company Name */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Company Name</label>
-                <input
-                  type="text"
-                  value={contactInfo.company}
-                  onChange={(e) => handleContactChange('company', e.target.value)}
-                  className="w-full px-4 py-3 bg-white border-2 border-green-200 rounded-lg text-gray-800 font-medium focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-100 transition-colors"
-                  placeholder="Enter company name"
-                />
-              </div>
-              
               {/* Company Name (2) */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Company Name (2)</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Company Name</label>
                 <input
                   type="text"
                   value={contactInfo.companyName2}

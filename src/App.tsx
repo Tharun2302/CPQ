@@ -463,6 +463,24 @@ function App() {
     console.log('✅ App: Contact info updated from configure session:', contactInfo);
   }, []);
 
+  // Handle client info changes from quote generator
+  const handleClientInfoChange = useCallback((clientInfo: { clientName: string; clientEmail: string; company: string }) => {
+    console.log('🔍 App: Received client info change from quote generator:', clientInfo);
+    setCurrentClientInfo({
+      clientName: clientInfo.clientName,
+      clientEmail: clientInfo.clientEmail,
+      company: clientInfo.company,
+      phone: '',
+      jobTitle: '',
+      companyDomain: '',
+      companyPhone: '',
+      companyAddress: ''
+    });
+    console.log('✅ App: Client info updated from quote generator:', clientInfo);
+  }, []);
+
+  // Handle HubSpot contact selection - moved after updateHubspotState declaration
+
   // Auto-load HubSpot data after successful connection
   const autoLoadHubSpotData = async () => {
     try {
@@ -1019,6 +1037,11 @@ function App() {
     }));
   };
 
+  // Handle HubSpot contact selection
+  const handleSelectHubSpotContact = useCallback((contact: any) => {
+    updateHubspotState({ selectedContact: contact });
+  }, [updateHubspotState]);
+
   const resetHubspotState = () => {
     setHubspotState({
       isConnected: false,
@@ -1303,7 +1326,7 @@ function App() {
             dataSizeGB: 100,
             numberOfInstances: 1,
             instanceType: 'Small',
-            migrationType: 'Email',
+            migrationType: 'Messaging',
             duration: 12
           },
           selectedTier: {
@@ -1347,7 +1370,7 @@ function App() {
               dataSizeGB: 100,
               numberOfInstances: 1,
               instanceType: 'Small',
-              migrationType: 'Email',
+              migrationType: 'Messaging',
               duration: 12
             }}
             calculation={selectedTier || {
@@ -1376,10 +1399,7 @@ function App() {
         );
 
       case 'quote':
-        console.log('🔍 Quote tab render - selectedTier:', selectedTier);
-        console.log('🔍 Quote tab render - configuration:', configuration);
-        console.log('🔍 Quote tab render - selectedTier type:', typeof selectedTier);
-        console.log('🔍 Quote tab render - selectedTier keys:', selectedTier ? Object.keys(selectedTier) : 'null');
+        // Debug logging removed to prevent console spam
         
         if (!selectedTier || !configuration) {
           console.log('❌ Quote tab: Missing selectedTier or configuration');
@@ -1443,7 +1463,7 @@ function App() {
           instanceType: 'Standard',
           numberOfInstances: 1,
           duration: 1,
-          migrationType: 'Content',
+          migrationType: 'Messaging',
           dataSizeGB: 0
         };
 
@@ -1453,21 +1473,10 @@ function App() {
             configuration={configuration || fallbackConfiguration}
             onGenerateQuote={handleGenerateQuote}
             hubspotState={hubspotState}
-            onSelectHubSpotContact={(contact) => updateHubspotState({ selectedContact: contact })}
+            onSelectHubSpotContact={handleSelectHubSpotContact}
             companyInfo={companyInfo}
             selectedTemplate={selectedTemplate}
-            onClientInfoChange={(clientInfo) => {
-              setCurrentClientInfo({
-                clientName: clientInfo.clientName,
-                clientEmail: clientInfo.clientEmail,
-                company: clientInfo.company,
-                phone: '',
-                jobTitle: '',
-                companyDomain: '',
-                companyPhone: '',
-                companyAddress: ''
-              });
-            }}
+            onClientInfoChange={handleClientInfoChange}
             dealData={activeDealData}
             configureContactInfo={configureContactInfo}
           />

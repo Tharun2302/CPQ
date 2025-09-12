@@ -24,6 +24,7 @@ interface DealData {
   stage?: string;
   ownerId?: string;
   company?: string;
+  companyByContact?: string;
   contactName?: string;
   contactEmail?: string;
 }
@@ -112,6 +113,32 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
 
   const [showPreview, setShowPreview] = useState(false);
   const [showContactSelector, setShowContactSelector] = useState(false);
+  const [quoteId, setQuoteId] = useState<string>('');
+
+  // Generate unique quote ID
+  const generateUniqueQuoteId = (): string => {
+    const timestamp = Date.now().toString();
+    const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+    return `Q-${timestamp.slice(-6)}-${random}`;
+  };
+
+  // Helper function to update client info and notify parent
+  const updateClientInfo = (updates: Partial<ClientInfo>) => {
+    const newClientInfo = { ...clientInfo, ...updates };
+    setClientInfo(newClientInfo);
+    
+    // Only notify parent when user makes actual changes (not during auto-fill)
+    if (onClientInfoChange && (updates.clientName || updates.clientEmail || updates.company)) {
+      onClientInfoChange(newClientInfo);
+    }
+  };
+
+  // Generate quote ID once when component mounts
+  useEffect(() => {
+    if (!quoteId) {
+      setQuoteId(generateUniqueQuoteId());
+    }
+  }, []); // Empty dependency array - run only once
   const [showPlaceholderPreview, setShowPlaceholderPreview] = useState(false);
   const [placeholderPreviewData, setPlaceholderPreviewData] = useState<{
     originalText: string;
@@ -191,7 +218,7 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
       const newClientInfo = {
         clientName: dealData.contactName || dealData.dealName || '',
         clientEmail: dealData.contactEmail || '',
-        company: dealData.company || dealData.dealName.split(' ')[0] + ' Inc.'
+        company: dealData.companyByContact || dealData.company || dealData.dealName.split(' ')[0] + ' Inc.'
       };
       
       console.log('✅ New client info from deal data:', newClientInfo);
@@ -201,30 +228,12 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
     }
   }, [dealData, hubspotState?.selectedContact, configureContactInfo]);
 
-  // Notify parent component when client info changes
-  useEffect(() => {
-    if (onClientInfoChange) {
-      onClientInfoChange(clientInfo);
-    }
-  }, [clientInfo, onClientInfoChange]);
+  // REMOVED: useEffect that was causing infinite loop by calling onClientInfoChange on every render
+  // onClientInfoChange will be called only when user makes actual changes to client info
 
-  // FINAL SAFETY CHECK: Ensure configureContactInfo is always applied (runs after all other useEffects)
-  useEffect(() => {
-    if (configureContactInfo) {
-      console.log('🔒 FINAL SAFETY CHECK: Ensuring configureContactInfo is applied:', configureContactInfo);
-      setClientInfo(configureContactInfo);
-    }
-  }, [configureContactInfo]);
+  // REMOVED: Duplicate useEffect that was causing infinite loop
 
-  // Add debugging
-  console.log('QuoteGenerator render:', {
-    hubspotState,
-    clientInfo,
-    showPreview,
-    calculation: calculation?.tier?.name,
-    configuration: configuration?.numberOfUsers,
-    dealData: dealData
-  });
+  // Debug logging removed to prevent console spam
 
   // Safety check - ensure we have required props
   if (!calculation || !configuration) {
@@ -328,9 +337,9 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
       '{{client_email}}': quote.clientEmail,
       '{{quote_number}}': quoteNumber,
       '{{date}}': new Date().toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+        year: '2-digit', 
+        month: '2-digit', 
+        day: '2-digit' 
       })
     };
 
@@ -404,11 +413,84 @@ Total Price: {{total price}}`;
   const handleViewInline = async () => {
     if (processedAgreement) {
       try {
-        // Convert DOCX to HTML for preview using a simple approach
-        // We'll create a preview that shows the actual document structure
+        console.log('✅ Converting DOCX to HTML for preview');
+        console.log('📄 Document type:', processedAgreement.type);
+        console.log('📄 Document size:', processedAgreement.size, 'bytes');
         
-        // Create a preview that simulates the actual DOCX content
-        // This is a simplified approach - in production you'd use a proper DOCX parser
+        // Convert DOCX to HTML using mammoth for proper preview
+        const mammoth = await import('mammoth');
+        
+        const arrayBuffer = await processedAgreement.arrayBuffer();
+        const result = await mammoth.convertToHtml({ arrayBuffer });
+        
+        console.log('✅ DOCX converted to HTML successfully');
+        console.log('📄 HTML length:', result.value.length);
+        
+        // Create HTML document with proper styling
+        const htmlContent = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Document Preview</title>
+            <style>
+              body { 
+                font-family: 'Times New Roman', serif; 
+                margin: 40px; 
+                line-height: 1.6;
+                color: #000;
+                background: white;
+                max-width: 800px;
+                margin: 40px auto;
+                padding: 20px;
+              }
+              h1, h2, h3, h4, h5, h6 {
+                color: #333;
+                margin-top: 20px;
+                margin-bottom: 10px;
+              }
+              p {
+                margin-bottom: 10px;
+                text-align: justify;
+              }
+              table {
+                border-collapse: collapse;
+                width: 100%;
+                margin: 20px 0;
+              }
+              table, th, td {
+                border: 1px solid #333;
+              }
+              th, td {
+                padding: 8px;
+                text-align: left;
+              }
+              th {
+                background-color: #f2f2f2;
+                font-weight: bold;
+              }
+              .highlight {
+                background-color: #ffffcc;
+              }
+            </style>
+          </head>
+          <body>
+            ${result.value}
+          </body>
+          </html>
+        `;
+        
+        // Create blob URL for the HTML content
+        const htmlBlobForPreview = new Blob([htmlContent], { type: 'text/html' });
+        const actualPreviewUrl = URL.createObjectURL(htmlBlobForPreview);
+        
+        setPreviewUrl(actualPreviewUrl);
+        setShowInlinePreview(true);
+        
+        console.log('✅ HTML preview URL created:', actualPreviewUrl);
+        
+        return; // Exit early to use HTML preview
+        
+        // Fallback HTML preview (kept for reference but not used)
         const previewHtml = `
           <!DOCTYPE html>
           <html>
@@ -794,7 +876,7 @@ Total Price: {{total price}}`;
           price: finalCalculation.totalCost,
           features: finalCalculation.tier.features
         },
-        quoteId: `QTE-001`,
+        quoteId: quoteId || generateUniqueQuoteId(),
         generatedDate: new Date(),
         status: 'draft'
       };
@@ -845,7 +927,14 @@ Total Price: {{total price}}`;
         console.log('  clientInfo object:', clientInfo);
         
         // Extract values with multiple fallback sources
-        const companyName = quoteData.company || clientInfo.company || 'Demo Company Inc.';
+        console.log('🔍 DEBUGGING COMPANY NAME SOURCES:');
+        console.log('  quoteData.company:', quoteData.company);
+        console.log('  clientInfo.company:', clientInfo.company);
+        console.log('  dealData:', dealData);
+        console.log('  configureContactInfo:', configureContactInfo);
+        
+        const companyName = configureContactInfo?.company || quoteData.company || clientInfo.company || dealData?.companyByContact || dealData?.company || 'Demo Company Inc.';
+        console.log('  Final companyName:', companyName);
         const userCount = quoteData.configuration?.numberOfUsers || 1;
         const userCost = quoteData.calculation?.userCost || 0;
         const migrationCost = quoteData.calculation?.migrationCost || 0;
@@ -925,6 +1014,7 @@ Total Price: {{total price}}`;
           '{{users_cost}}': formatCurrency(userCost || 0), // FIXED: Template uses underscore, not dot
           '{{Duration of months}}': (duration || 1).toString(),
           '{{Duration_of_months}}': (duration || 1).toString(), // Underscore version found in template
+          '{{Suration_of_months}}': (duration || 1).toString(), // Handle typo version
           '{{total price}}': formatCurrency(totalCost || 0),
           '{{total_price}}': formatCurrency(totalCost || 0), // Underscore version found in template
           '{{price_migration}}': formatCurrency(migrationCost || 0),
@@ -942,9 +1032,14 @@ Total Price: {{total price}}`;
           '{{migration_price}}': formatCurrency(migrationCost || 0),
           '{{duration_months}}': (duration || 1).toString(),
           '{{date}}': new Date().toLocaleDateString('en-US', {
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+            year: '2-digit', 
+            month: '2-digit', 
+            day: '2-digit' 
+          }),
+          '{{Date}}': new Date().toLocaleDateString('en-US', {
+            year: '2-digit', 
+            month: '2-digit', 
+            day: '2-digit' 
           })
         };
         
@@ -966,13 +1061,13 @@ Total Price: {{total price}}`;
         
         // Debug: Check each token value individually
         console.log('🔍 Individual token values:');
-        console.log('  {{Company Name}}:', templateData['{{Company Name}}']);
-        console.log('  {{users_count}}:', templateData['{{users_count}}']);
-        console.log('  {{users.cost}}:', templateData['{{users.cost}}']); // FIXED: Check dot notation
-        console.log('  {{users_cost}}:', templateData['{{users_cost}}']); // Check underscore version
-        console.log('  {{Duration of months}}:', templateData['{{Duration of months}}']);
-        console.log('  {{total price}}:', templateData['{{total price}}']);
-        console.log('  {{price_migration}}:', templateData['{{price_migration}}']);
+        console.log('  Company Name:', templateData['{{Company Name}}']);
+        console.log('  users_count:', templateData['{{users_count}}']);
+        console.log('  users.cost:', templateData['{{users.cost}}']); // FIXED: Check dot notation
+        console.log('  users_cost:', templateData['{{users_cost}}']); // Check underscore version
+        console.log('  Duration of months:', templateData['{{Duration of months}}']);
+        console.log('  total price:', templateData['{{total price}}']);
+        console.log('  price_migration:', templateData['{{price_migration}}']);
         
         // Debug: Check the source data
         console.log('🔍 Source data debugging:');
@@ -1022,7 +1117,7 @@ Total Price: {{total price}}`;
         }
         
         // CRITICAL: Final check - ensure key tokens are not undefined
-        const criticalTokens = ['{{Company Name}}', '{{Company_Name}}', '{{users_count}}', '{{users_cost}}', '{{Duration of months}}', '{{Duration_of_months}}', '{{total price}}', '{{total_price}}', '{{price_migration}}', '{{company name}}'];
+        const criticalTokens = ['{{Company Name}}', '{{Company_Name}}', '{{users_count}}', '{{users_cost}}', '{{Duration of months}}', '{{Duration_of_months}}', '{{total price}}', '{{total_price}}', '{{price_migration}}', '{{company name}}', '{{Date}}'];
         const criticalIssues = criticalTokens.filter(token => 
           !templateData[token] || templateData[token] === 'undefined' || templateData[token] === ''
         );
@@ -1048,6 +1143,12 @@ Total Price: {{total price}}`;
               templateData[token] = formatCurrency(migrationCost || 0);
             } else if (token === '{{company name}}') {
               templateData[token] = companyName || 'Demo Company Inc.';
+            } else if (token === '{{Date}}') {
+              templateData[token] = new Date().toLocaleDateString('en-US', {
+                year: '2-digit', 
+                month: '2-digit', 
+                day: '2-digit' 
+              });
             }
             console.log(`🔧 FIXED: ${token} = ${templateData[token]}`);
           });
@@ -1057,16 +1158,16 @@ Total Price: {{total price}}`;
         
         // CRITICAL: Show the exact values being sent for the key tokens
         console.log('🎯 FINAL TOKEN VALUES BEING SENT:');
-        console.log('  {{Company Name}}:', templateData['{{Company Name}}']);
-        console.log('  {{Company_Name}}:', templateData['{{Company_Name}}']);
-        console.log('  {{users_count}}:', templateData['{{users_count}}']);
-        console.log('  {{users_cost}}:', templateData['{{users_cost}}']);
-        console.log('  {{Duration of months}}:', templateData['{{Duration of months}}']);
-        console.log('  {{Duration_of_months}}:', templateData['{{Duration_of_months}}']);
-        console.log('  {{total price}}:', templateData['{{total price}}']);
-        console.log('  {{total_price}}:', templateData['{{total_price}}']);
-        console.log('  {{price_migration}}:', templateData['{{price_migration}}']);
-        console.log('  {{company name}}:', templateData['{{company name}}']);
+        console.log('  Company Name:', templateData['{{Company Name}}']);
+        console.log('  Company_Name:', templateData['{{Company_Name}}']);
+        console.log('  users_count:', templateData['{{users_count}}']);
+        console.log('  users_cost:', templateData['{{users_cost}}']);
+        console.log('  Duration of months:', templateData['{{Duration of months}}']);
+        console.log('  Duration_of_months:', templateData['{{Duration_of_months}}']);
+        console.log('  total price:', templateData['{{total price}}']);
+        console.log('  total_price:', templateData['{{total_price}}']);
+        console.log('  price_migration:', templateData['{{price_migration}}']);
+        console.log('  company name:', templateData['{{company name}}']);
         
         // Debug: Show the exact data being sent to DOCX processor
         console.log('🚀 SENDING TO DOCX PROCESSOR:');
@@ -1197,17 +1298,100 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
 
       // Show preview of the processed agreement
       if (processedDocument) {
-        // Create preview URL
-        const previewUrl = URL.createObjectURL(processedDocument);
-        
-        console.log('🔗 Preview URL created:', previewUrl);
+        console.log('✅ Agreement processed successfully');
         console.log('📄 Processed document size:', processedDocument.size, 'bytes');
         console.log('📄 Processed document type:', processedDocument.type);
         
-        console.log('✅ Agreement processed successfully');
-        
         // Store the processed document for preview and download
         setProcessedAgreement(processedDocument);
+        
+        // Convert DOCX to HTML for preview if it's a DOCX file
+        if (processedDocument.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+          try {
+            console.log('🔄 Converting DOCX to HTML for preview...');
+            const mammoth = await import('mammoth');
+            
+            const arrayBuffer = await processedDocument.arrayBuffer();
+            const result = await mammoth.convertToHtml({ arrayBuffer });
+            
+            console.log('✅ DOCX converted to HTML successfully');
+            console.log('📄 HTML length:', result.value.length);
+            
+            // Create HTML document with proper styling
+            const htmlContent = `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <title>Document Preview</title>
+                <style>
+                  body { 
+                    font-family: 'Times New Roman', serif; 
+                    margin: 40px; 
+                    line-height: 1.6;
+                    color: #000;
+                    background: white;
+                    max-width: 800px;
+                    margin: 40px auto;
+                    padding: 20px;
+                  }
+                  h1, h2, h3, h4, h5, h6 {
+                    color: #333;
+                    margin-top: 20px;
+                    margin-bottom: 10px;
+                  }
+                  p {
+                    margin-bottom: 10px;
+                    text-align: justify;
+                  }
+                  table {
+                    border-collapse: collapse;
+                    width: 100%;
+                    margin: 20px 0;
+                  }
+                  table, th, td {
+                    border: 1px solid #333;
+                  }
+                  th, td {
+                    padding: 8px;
+                    text-align: left;
+                  }
+                  th {
+                    background-color: #f2f2f2;
+                    font-weight: bold;
+                  }
+                  .highlight {
+                    background-color: #ffffcc;
+                  }
+                </style>
+              </head>
+              <body>
+                ${result.value}
+              </body>
+              </html>
+            `;
+            
+            // Create blob URL for the HTML content
+            const htmlBlobForInitial = new Blob([htmlContent], { type: 'text/html' });
+            const previewUrl = URL.createObjectURL(htmlBlobForInitial);
+            
+            setPreviewUrl(previewUrl);
+            setShowInlinePreview(true); // Show the HTML preview by default
+            console.log('🔗 HTML preview URL created:', previewUrl);
+            
+          } catch (error) {
+            console.error('❌ Error converting DOCX to HTML:', error);
+            // Fallback to direct document URL
+            const previewUrl = URL.createObjectURL(processedDocument);
+            setPreviewUrl(previewUrl);
+            setShowInlinePreview(true);
+          }
+        } else {
+          // For PDF files, use direct URL
+          const previewUrl = URL.createObjectURL(processedDocument);
+          setPreviewUrl(previewUrl);
+          setShowInlinePreview(true);
+        }
+        
         setShowAgreementPreview(true);
         
         // Show success message
@@ -1362,7 +1546,7 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
                   type="text"
                   required
                   value={clientInfo.clientName}
-                  onChange={(e) => setClientInfo({ ...clientInfo, clientName: e.target.value })}
+                  onChange={(e) => updateClientInfo({ clientName: e.target.value })}
                   className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 bg-white/80 backdrop-blur-sm hover:border-blue-300 text-lg font-medium"
                   placeholder="Enter client name"
                 />
@@ -1379,7 +1563,7 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
                   type="email"
                   required
                   value={clientInfo.clientEmail}
-                  onChange={(e) => setClientInfo({ ...clientInfo, clientEmail: e.target.value })}
+                  onChange={(e) => updateClientInfo({ clientEmail: e.target.value })}
                   className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 bg-white/80 backdrop-blur-sm hover:border-blue-300 text-lg font-medium"
                   placeholder="Enter email address"
                 />
@@ -1396,7 +1580,7 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
                   type="text"
                   required
                   value={clientInfo.company}
-                  onChange={(e) => setClientInfo({ ...clientInfo, company: e.target.value })}
+                  onChange={(e) => updateClientInfo({ company: e.target.value })}
                   className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 bg-white/80 backdrop-blur-sm hover:border-blue-300 text-lg font-medium"
                   placeholder="Enter company name"
                 />
@@ -1563,7 +1747,7 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
   }
 
   const QuotePreview = ({ dealData }: { dealData?: any }) => {
-    console.log('🔍 QuotePreview render - dealData:', dealData);
+    // Debug logging removed to prevent console spam
     return (
     <div data-quote-preview className="bg-gradient-to-br from-white via-slate-50/30 to-blue-50/20 p-10 border-2 border-blue-100 rounded-2xl shadow-2xl max-w-5xl mx-auto backdrop-blur-sm">
       {/* Header */}
@@ -1572,7 +1756,7 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
           <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent mb-3">
             PROFESSIONAL QUOTE
           </h1>
-          <p className="text-gray-700 font-semibold text-lg">Quote #Q-{Date.now().toString().slice(-6)}</p>
+          <p className="text-gray-700 font-semibold text-lg">Quote #{quoteId || generateUniqueQuoteId()}</p>
           <p className="text-gray-600 font-medium">{new Date().toLocaleDateString()}</p>
         </div>
         <div className="text-right">
@@ -2133,6 +2317,11 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
                       >
                         👁️ View Document
                       </button>
+                    )}
+                    {showInlinePreview && (
+                      <div className="text-sm text-gray-600 bg-green-50 px-4 py-2 rounded-lg">
+                        📄 Showing actual document content (converted from DOCX)
+                      </div>
                     )}
                   </div>
                   <div className="flex-1 bg-white overflow-hidden">
