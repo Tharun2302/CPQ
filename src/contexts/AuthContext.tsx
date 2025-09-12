@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, AuthContextType, SignUpData } from '../types/auth';
 
 // Create the context
@@ -31,6 +32,7 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -157,7 +159,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         align-items: center;
         z-index: 9999;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      `;
+`;
       
       modal.innerHTML = `
         <div style="
@@ -224,6 +226,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Update state
     setUser(null);
     setIsAuthenticated(false);
+    
+    // Navigate to home page after logout
+    navigate('/');
   };
 
   const value: AuthContextType = {
