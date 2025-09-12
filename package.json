@@ -16,6 +16,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@azure/msal-browser": "^4.22.1",
+    "@azure/msal-react": "^3.0.19",
     "@react-pdf/renderer": "^4.3.0",
     "@supabase/supabase-js": "^2.55.0",
     "@types/node": "^24.3.0",

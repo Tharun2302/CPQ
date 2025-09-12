@@ -1,9 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, AuthContextType, SignUpData } from '../types/auth';
+import { User, AuthContextType, SignUpData, AuthProvider as AuthProviderType } from '../types/auth';
+// import { MicrosoftAuth } from '../utils/microsoftAuth'; // Temporarily disabled for debugging
 
 // Create the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Microsoft authentication using custom OAuth implementation
+// This avoids MSAL library issues that cause white page problems
 
 // Mock user database (in a real app, this would be API calls)
 const mockUsers: User[] = [
@@ -11,12 +15,14 @@ const mockUsers: User[] = [
     id: 'user_1',
     name: 'raya',
     email: 'raya@gmail.com',
+    provider: 'email',
     createdAt: '2024-01-01T00:00:00Z'
   },
   {
     id: 'user_2',
     name: 'tharun',
     email: 'tharun@gmail.com',
+    provider: 'email',
     createdAt: '2024-01-02T00:00:00Z'
   }
 ];
@@ -27,15 +33,16 @@ const mockPasswords: { [key: string]: string } = {
   'tharun@gmail.com': 'tharun123'
 };
 
-interface AuthProviderProps {
+interface AuthProviderComponentProps {
   children: ReactNode;
 }
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children }) => {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [msalError, setMsalError] = useState<string | null>(null);
 
   // Check for existing authentication on app load
   useEffect(() => {
@@ -115,6 +122,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         id: `user_${Date.now()}`,
         name: userData.name,
         email: userData.email,
+          provider: 'email' as AuthProviderType,
         createdAt: new Date().toISOString()
       };
       
@@ -140,6 +148,131 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loginWithMicrosoft = async (): Promise<boolean> => {
+    try {
+      setLoading(true);
+      
+      // Simple Microsoft OAuth redirect (no complex libraries)
+      const clientId = import.meta.env.VITE_MSAL_CLIENT_ID || 'e71e69a8-07fd-4110-8d77-9e4326027969';
+      console.log('Microsoft Client ID:', clientId);
+      console.log('Environment variables:', import.meta.env);
+      
+      if (!clientId || clientId === 'your-client-id-here') {
+        console.warn('Microsoft authentication is not configured - Client ID missing or invalid');
+        console.warn('Available env vars:', Object.keys(import.meta.env).filter(key => key.includes('MSAL')));
+        return false;
+      }
+      
+      // Create Microsoft OAuth URL
+      const redirectUri = encodeURIComponent(window.location.origin + '/auth/microsoft/callback');
+      const scopes = encodeURIComponent('openid profile email User.Read');
+      const state = Math.random().toString(36).substring(2, 15);
+
+      const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
+        `client_id=${clientId}&` +
+        `response_type=code&` +
+        `redirect_uri=${redirectUri}&` +
+        `scope=${scopes}&` +
+        `response_mode=query&` +
+        `state=${state}&` +
+        `prompt=select_account`;
+      
+      // Open popup window
+      console.log('Opening Microsoft OAuth popup with URL:', authUrl);
+      const popup = window.open(
+        authUrl,
+        'microsoft-auth',
+        'width=500,height=600,scrollbars=yes,resizable=yes'
+      );
+      
+      if (!popup) {
+        console.error('Failed to open Microsoft auth popup - popup blocked or failed');
+        alert('Please allow popups for this site to use Microsoft authentication');
+        return false;
+      }
+      
+      console.log('Microsoft OAuth popup opened successfully');
+      
+      // Wait for popup to close or receive message
+      return new Promise((resolve) => {
+        const checkClosed = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(checkClosed);
+            resolve(false);
+          }
+        }, 1000);
+        
+        // Listen for messages from popup
+        const messageListener = (event: MessageEvent) => {
+          console.log('Message received in AuthContext:', event.data);
+          console.log('Message origin:', event.origin);
+          console.log('Expected origin:', window.location.origin);
+          
+          if (event.origin !== window.location.origin) {
+            console.log('Message origin mismatch - ignoring');
+            return;
+          }
+          
+          if (event.data.type === 'MICROSOFT_AUTH_SUCCESS') {
+            console.log('Microsoft auth success message received');
+            clearInterval(checkClosed);
+            window.removeEventListener('message', messageListener);
+            popup.close();
+            
+            // Create user from Microsoft account
+            const microsoftUser = event.data.user;
+            const user: User = {
+              id: microsoftUser.id,
+              name: microsoftUser.name,
+              email: microsoftUser.email,
+              provider: 'microsoft' as AuthProviderType,
+              createdAt: new Date().toISOString()
+            };
+            
+            // Check if user already exists, if not add them
+            const existingUser = mockUsers.find(u => u.email === user.email);
+            if (!existingUser) {
+              mockUsers.push(user);
+            }
+            
+            // Store in localStorage
+            localStorage.setItem('cpq_user', JSON.stringify(user));
+            localStorage.setItem('cpq_token', microsoftUser.accessToken);
+            
+            // Update state
+            setUser(user);
+            setIsAuthenticated(true);
+            
+            console.log('Microsoft login successful');
+            resolve(true);
+          } else if (event.data.type === 'MICROSOFT_AUTH_ERROR') {
+            console.log('Microsoft auth error message received');
+            clearInterval(checkClosed);
+            window.removeEventListener('message', messageListener);
+            popup.close();
+            console.error('Microsoft authentication error:', event.data.error);
+            resolve(false);
+          } else {
+            console.log('Unknown message type:', event.data.type);
+          }
+        };
+        
+        window.addEventListener('message', messageListener);
+      });
+      
+    } catch (error) {
+      console.error('Microsoft login error:', error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signupWithMicrosoft = async (): Promise<boolean> => {
+    // For Microsoft, signup and login are the same process
+    return await loginWithMicrosoft();
   };
 
   const logout = () => {
@@ -235,8 +368,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated,
     user,
     login,
+    loginWithMicrosoft,
     logout,
     signup,
+    signupWithMicrosoft,
     loading
   };
 
