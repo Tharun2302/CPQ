@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calculator, FileText, Settings, BarChart3, Sparkles, DollarSign, MessageSquare, Upload, Building } from 'lucide-react';
+import { Calculator, FileText, Settings, Sparkles, DollarSign, Upload, Building } from 'lucide-react';
 
 interface NavigationProps {
   activeTab: string;
@@ -14,8 +14,6 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
     { id: 'quote', label: 'Quote', icon: FileText },
     { id: 'quotes', label: 'Quotes', icon: FileText },
     { id: 'templates', label: 'Templates', icon: Upload },
-    { id: 'hubspot', label: 'HubSpot', icon: MessageSquare },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 

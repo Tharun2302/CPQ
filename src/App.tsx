@@ -4,13 +4,11 @@ import ConfigurationForm from './components/ConfigurationForm';
 import PricingComparison from './components/PricingComparison';
 import PricingTierConfig from './components/PricingTierConfig';
 
-import HubSpotIntegration from './components/HubSpotIntegration';
 import QuoteGenerator from './components/QuoteGenerator';
 import QuoteManager from './components/QuoteManager';
 import TemplateManager from './components/TemplateManager';
 import DealDetails from './components/DealDetails';
 
-import Analytics from './components/Analytics';
 import Settings from './components/Settings';
 import DigitalSignatureForm from './components/DigitalSignatureForm';
 import { ConfigurationData, PricingCalculation, PricingTier, Quote } from './types/pricing';
@@ -301,13 +299,13 @@ function App() {
     const ownerId = urlParams.get('ownerId');
     
     // Contact Information (from fetched_objects.fetched_object_176195683)
-    const contactEmail = urlParams.get('ContactEmail');
-    const contactFirstName = urlParams.get('ContactFirstName');
-    const contactLastName = urlParams.get('ContactLastName');
+    const contactEmail = urlParams.get('ContactEmail') || urlParams.get('contactEmail');
+    const contactFirstName = urlParams.get('ContactFirstName') || urlParams.get('contactFirstName');
+    const contactLastName = urlParams.get('ContactLastName') || urlParams.get('contactLastName');
     
     // Company Information (from fetched_objects.fetched_object_176195685)
-    const companyName = urlParams.get('CompanyName');
-    const companyByContact = urlParams.get('CompanyByContact') || urlParams.get('CompanyFromContact');
+    const companyName = urlParams.get('CompanyName') || urlParams.get('companyName');
+    const companyByContact = urlParams.get('CompanyByContact') || urlParams.get('CompanyFromContact') || urlParams.get('companyByContact');
     
     // Additional HubSpot parameters (if available)
     const dealAmount = urlParams.get('deal.amount');
@@ -317,6 +315,9 @@ function App() {
     const companyDomain = urlParams.get('companyDomain');
     const companyPhone = urlParams.get('companyPhone');
     const companyAddress = urlParams.get('companyAddress');
+    
+    // Debug: Log all URL parameters
+    console.log('🔍 All URL parameters:', Object.fromEntries(urlParams.entries()));
     
     console.log('🔍 Parsing URL parameters:', {
       dealId,
@@ -342,10 +343,11 @@ function App() {
       companyAddress
     });
     
-    if (dealId) {
+    // Create deal data if we have any deal information OR contact/company information
+    if (dealId || contactEmail || contactFirstName || contactLastName || companyName || companyByContact) {
       const dealData = {
-        dealId,
-        dealName: dealName || 'Unnamed Deal',
+        dealId: dealId || 'HUBSPOT-' + Date.now(),
+        dealName: dealName || 'HubSpot Deal',
         amount: dealAmount || amount || 'Not Set',
         closeDate: closeDate || '',
         stage: stage || 'Not Set',
@@ -353,7 +355,11 @@ function App() {
         // Contact Information from HubSpot
         company: companyName || 'Not Available',
         companyByContact: companyByContact || 'Not Available',
-        contactName: contactFirstName && contactLastName ? `${contactFirstName} ${contactLastName}`.trim() : 'Contact from HubSpot',
+        contactName: (contactFirstName && contactLastName ? `${contactFirstName} ${contactLastName}`.trim() : 
+                     contactFirstName || contactLastName || 
+                     urlParams.get('contactName') || 
+                     urlParams.get('ContactName') || 
+                     'Contact from HubSpot'),
         contactEmail: contactEmail || 'email@hubspot.com',
         contactPhone: contactPhone || '+1 (555) 123-4567',
         contactJobTitle: contactJobTitle || 'Position from HubSpot',
@@ -364,6 +370,7 @@ function App() {
       
       console.log('📋 Created deal data:', dealData);
       setDealData(dealData);
+      console.log('✅ Deal data set in state');
       return dealData;
     }
     return null;
@@ -543,9 +550,16 @@ function App() {
 
   // Handle URL parameters on component mount
   useEffect(() => {
+    console.log('🔍 App component mounted, parsing URL parameters...');
+    console.log('🔍 Current URL:', window.location.href);
+    console.log('🔍 URL search params:', window.location.search);
+    
     const dealParams = parseDealParameters();
     
+    console.log('🔍 Deal params result:', dealParams);
+    
     if (dealParams) {
+      console.log('✅ Deal parameters found, processing...');
       // Auto-populate the configuration form with deal data
       setConfiguration(prev => {
         if (prev) {
@@ -585,6 +599,8 @@ function App() {
       setTimeout(() => {
         refreshDealData();
       }, 1000); // Small delay to ensure component is fully mounted
+    } else {
+      console.log('⚠️ No deal parameters found in URL');
     }
   }, []);
 
@@ -594,7 +610,18 @@ function App() {
       getDealInfo,
       updateDealInfo,
       clearDealInfo,
-      debugDealInfo
+      debugDealInfo,
+      parseDealParameters,
+      testUrlParams: () => {
+        console.log('🧪 Testing URL parameter parsing...');
+        const testUrl = '?dealId=123&dealName=Test%20Deal&ContactEmail=test@example.com&ContactFirstName=John&ContactLastName=Smith&CompanyName=Test%20Company&CompanyByContact=Test%20Company%20By%20Contact';
+        const originalUrl = window.location.href;
+        window.history.replaceState({}, '', testUrl);
+        const result = parseDealParameters();
+        window.history.replaceState({}, '', originalUrl);
+        console.log('🧪 Test result:', result);
+        return result;
+      }
     };
     console.log('🔧 Deal functions available in console:');
     console.log('   window.dealFunctions.getDealInfo()');
@@ -713,75 +740,24 @@ function App() {
     }
   }, []);
 
-  // Auto-connect to HubSpot on app startup - ALWAYS CONNECT
+  // Auto-connect to HubSpot in demo mode on app startup
   useEffect(() => {
     const autoConnectToHubSpot = async () => {
-      console.log('🚀 ALWAYS CONNECTING to HubSpot on app startup...');
-      console.log('🔍 Current state:', { 
-        isConnected: hubspotState.isConnected, 
-        isConnecting: hubspotState.isConnecting,
-        showDemoMode: hubspotState.showDemoMode 
-      });
+      console.log('🚀 AUTO-CONNECTING to HubSpot in demo mode...');
       
-      try {
-        setHubspotState(prev => ({ ...prev, isConnecting: true, connectionError: null }));
-        
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
-        console.log('🌐 Testing HubSpot connection via backend:', `${backendUrl}/api/hubspot/test`);
-        
-        const response = await fetch(`${backendUrl}/api/hubspot/test`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          signal: AbortSignal.timeout(15000) // 15 second timeout
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success) {
-            console.log('✅ Auto-connection to HubSpot successful!');
-            setHubspotState(prev => ({ 
-              ...prev, 
-              isConnected: true, 
-              showDemoMode: false, 
-              connectionError: null,
-              isConnecting: false 
-            }));
-            
-            // Auto-load HubSpot data
-            console.log('🔄 Auto-loading HubSpot data...');
-            await autoLoadHubSpotData();
-          } else {
-            console.log('⚠️ HubSpot API test failed, using demo mode');
-            setHubspotState(prev => ({ 
-              ...prev, 
-              isConnected: true, 
-              showDemoMode: true, 
-              connectionError: null,
-              isConnecting: false 
-            }));
-          }
-        } else {
-          console.log('⚠️ Backend server not available, using demo mode');
-          setHubspotState(prev => ({ 
-            ...prev, 
-            isConnected: true, 
-            showDemoMode: true, 
-            connectionError: null,
-            isConnecting: false 
-          }));
-        }
-      } catch (error) {
-        console.log('⚠️ Auto-connection failed, using demo mode:', error);
-        setHubspotState(prev => ({ 
-          ...prev, 
-          isConnected: true, 
-          showDemoMode: true, 
-          connectionError: error instanceof Error ? error.message : 'Connection failed',
-          isConnecting: false 
-        }));
-      }
+      // Always connect to HubSpot in demo mode
+      setHubspotState(prev => ({ 
+        ...prev, 
+        isConnected: true, 
+        showDemoMode: true, 
+        connectionError: null,
+        isConnecting: false 
+      }));
+      console.log('✅ HubSpot auto-connected in demo mode');
+      
+      // Auto-load HubSpot data
+      console.log('🔄 Auto-loading HubSpot data...');
+      await autoLoadHubSpotData();
     };
 
     // Add a small delay to ensure the app is fully loaded
@@ -808,7 +784,8 @@ function App() {
 
   const fetchSignatureFormData = async (formId: string) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/signature/form/${formId}`);
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const response = await fetch(`${backendUrl}/api/signature/form/${formId}`);
       if (response.ok) {
         const data = await response.json();
         setSignatureFormData(data.form);
@@ -854,7 +831,8 @@ function App() {
     const loadQuotes = async () => {
       try {
         // First try to load from database
-        const response = await fetch('http://localhost:3001/api/quotes');
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+        const response = await fetch(`${backendUrl}/api/quotes`);
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.quotes) {
@@ -1042,25 +1020,6 @@ function App() {
     updateHubspotState({ selectedContact: contact });
   }, [updateHubspotState]);
 
-  const resetHubspotState = () => {
-    setHubspotState({
-      isConnected: false,
-      isConnecting: false,
-      connectionError: null,
-      showDemoMode: false,
-      hubspotContacts: [],
-      hubspotDeals: [],
-      isLoadingContacts: false,
-      isLoadingDeals: false,
-      createdContact: null,
-      createdDeal: null,
-      isCreatingContact: false,
-      isCreatingDeal: false,
-      selectedContact: null,
-      searchTerm: ''
-    });
-    localStorage.removeItem('hubspotState');
-  };
 
   // Company information update function
   const updateCompanyInfo = (updates: Partial<typeof companyInfo>) => {
@@ -1100,7 +1059,8 @@ function App() {
 
     // Save quote to database
     try {
-      const response = await fetch('http://localhost:3001/api/quotes', {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const response = await fetch(`${backendUrl}/api/quotes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1136,7 +1096,7 @@ function App() {
     
     // Delete from database
     try {
-      const response = await fetch(`http://localhost:3001/api/quotes/${quoteId}`, {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/quotes/${quoteId}`, {
         method: 'DELETE'
       });
       
@@ -1161,7 +1121,7 @@ function App() {
     
     // Update in database
     try {
-      const response = await fetch(`http://localhost:3001/api/quotes/${quoteId}`, {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/quotes/${quoteId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1296,107 +1256,6 @@ function App() {
 
 
 
-      case 'hubspot':
-        // Add debugging
-        console.log('🔍 HubSpot tab render:', {
-          selectedTier,
-          configuration,
-          hubspotState,
-          companyInfo
-        });
-        
-        // Create a default quote if none exists
-        const defaultQuote: Quote = selectedTier ? {
-          id: 'temp-quote',
-          clientName: 'Sample Client',
-          clientEmail: 'client@example.com',
-          company: companyInfo.name || 'Sample Company', // Use actual company name from settings
-          configuration: configuration!,
-          selectedTier: selectedTier.tier,
-          calculation: selectedTier,
-          createdAt: new Date(),
-          status: 'draft' as const
-        } : {
-          id: 'demo-quote',
-          clientName: 'Demo Client',
-          clientEmail: 'demo@example.com',
-          company: companyInfo.name || 'Demo Company', // Use actual company name from settings
-          configuration: configuration || {
-            numberOfUsers: 10,
-            dataSizeGB: 100,
-            numberOfInstances: 1,
-            instanceType: 'Small',
-            migrationType: 'Messaging',
-            duration: 12
-          },
-          selectedTier: {
-            id: 'basic-tier',
-            name: 'Basic',
-            perUserCost: 30.0,
-            perGBCost: 1.00,
-            managedMigrationCost: 300,
-            instanceCost: 500,
-            userLimits: { from: 1, to: 1000 },
-            gbLimits: { from: 1, to: 10000 },
-            features: ['Basic support', 'Standard migration', 'Email support', 'Basic reporting']
-          },
-          calculation: selectedTier || {
-            tier: {
-              id: 'basic-tier',
-              name: 'Basic',
-              perUserCost: 30.0,
-              perGBCost: 1.00,
-              managedMigrationCost: 300,
-              instanceCost: 500,
-              userLimits: { from: 1, to: 1000 },
-              gbLimits: { from: 1, to: 10000 },
-              features: ['Basic support', 'Standard migration', 'Email support', 'Basic reporting']
-            },
-            userCost: 30,
-            dataCost: 100,
-            migrationCost: 300,
-            instanceCost: 500,
-            totalCost: 930
-          },
-          createdAt: new Date(),
-          status: 'draft' as const
-        };
-        
-        return (
-          <HubSpotIntegration
-            quote={defaultQuote}
-            configuration={configuration || {
-              numberOfUsers: 10,
-              dataSizeGB: 100,
-              numberOfInstances: 1,
-              instanceType: 'Small',
-              migrationType: 'Messaging',
-              duration: 12
-            }}
-            calculation={selectedTier || {
-              tier: {
-                id: 'basic-tier',
-                name: 'Basic',
-                perUserCost: 30.0,
-                perGBCost: 1.00,
-                managedMigrationCost: 300,
-                instanceCost: 500,
-                userLimits: { from: 1, to: 1000 },
-                gbLimits: { from: 1, to: 10000 },
-                features: ['Basic support', 'Standard migration', 'Email support', 'Basic reporting']
-              },
-              userCost: 30,
-              dataCost: 100,
-              migrationCost: 300,
-              instanceCost: 500,
-              totalCost: 930
-            }}
-            hubspotState={hubspotState}
-            updateHubspotState={updateHubspotState}
-            resetHubspotState={resetHubspotState}
-            onUseDealData={handleUseDealData}
-          />
-        );
 
       case 'quote':
         // Debug logging removed to prevent console spam
@@ -1507,8 +1366,6 @@ function App() {
 
 
 
-      case 'analytics':
-        return <Analytics />;
 
       case 'settings':
         return (
