@@ -8,12 +8,6 @@ const MicrosoftCallback: React.FC = () => {
     const handleCallback = () => {
       const code = searchParams.get('code');
       const error = searchParams.get('error');
-      const state = searchParams.get('state');
-
-      console.log('Microsoft Callback - Code:', code);
-      console.log('Microsoft Callback - Error:', error);
-      console.log('Microsoft Callback - State:', state);
-      console.log('Microsoft Callback - Full URL:', window.location.href);
 
       if (error) {
         console.error('Microsoft OAuth error:', error);
@@ -25,7 +19,6 @@ const MicrosoftCallback: React.FC = () => {
       }
 
       if (code) {
-        console.log('Microsoft OAuth success - processing code:', code);
         // Simulate successful authentication with mock data
         const mockUser = {
           id: 'microsoft_' + Date.now(),
@@ -34,13 +27,10 @@ const MicrosoftCallback: React.FC = () => {
           accessToken: 'mock_access_token_' + Date.now()
         };
 
-        console.log('Sending success message to parent window:', mockUser);
         window.opener?.postMessage({
           type: 'MICROSOFT_AUTH_SUCCESS',
           user: mockUser
         }, window.location.origin);
-      } else {
-        console.log('No code received - this might be a direct visit to the callback URL');
       }
     };
 

@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, AuthContextType, SignUpData, AuthProvider as AuthProviderType } from '../types/auth';
-// import { MicrosoftAuth } from '../utils/microsoftAuth'; // Temporarily disabled for debugging
 
 // Create the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,7 +41,6 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [msalError, setMsalError] = useState<string | null>(null);
 
   // Check for existing authentication on app load
   useEffect(() => {
@@ -156,12 +154,9 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
       
       // Simple Microsoft OAuth redirect (no complex libraries)
       const clientId = import.meta.env.VITE_MSAL_CLIENT_ID || 'e71e69a8-07fd-4110-8d77-9e4326027969';
-      console.log('Microsoft Client ID:', clientId);
-      console.log('Environment variables:', import.meta.env);
       
       if (!clientId || clientId === 'your-client-id-here') {
         console.warn('Microsoft authentication is not configured - Client ID missing or invalid');
-        console.warn('Available env vars:', Object.keys(import.meta.env).filter(key => key.includes('MSAL')));
         return false;
       }
       
@@ -180,7 +175,6 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
         `prompt=select_account`;
       
       // Open popup window
-      console.log('Opening Microsoft OAuth popup with URL:', authUrl);
       const popup = window.open(
         authUrl,
         'microsoft-auth',
@@ -193,8 +187,6 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
         return false;
       }
       
-      console.log('Microsoft OAuth popup opened successfully');
-      
       // Wait for popup to close or receive message
       return new Promise((resolve) => {
         const checkClosed = setInterval(() => {
@@ -206,17 +198,11 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
         
         // Listen for messages from popup
         const messageListener = (event: MessageEvent) => {
-          console.log('Message received in AuthContext:', event.data);
-          console.log('Message origin:', event.origin);
-          console.log('Expected origin:', window.location.origin);
-          
           if (event.origin !== window.location.origin) {
-            console.log('Message origin mismatch - ignoring');
             return;
           }
           
           if (event.data.type === 'MICROSOFT_AUTH_SUCCESS') {
-            console.log('Microsoft auth success message received');
             clearInterval(checkClosed);
             window.removeEventListener('message', messageListener);
             popup.close();
@@ -245,17 +231,13 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
             setUser(user);
             setIsAuthenticated(true);
             
-            console.log('Microsoft login successful');
             resolve(true);
           } else if (event.data.type === 'MICROSOFT_AUTH_ERROR') {
-            console.log('Microsoft auth error message received');
             clearInterval(checkClosed);
             window.removeEventListener('message', messageListener);
             popup.close();
             console.error('Microsoft authentication error:', event.data.error);
             resolve(false);
-          } else {
-            console.log('Unknown message type:', event.data.type);
           }
         };
         
