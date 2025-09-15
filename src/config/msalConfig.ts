@@ -3,9 +3,9 @@ import { Configuration, PopupRequest } from '@azure/msal-browser';
 // MSAL configuration for port 5173
 export const msalConfig: Configuration = {
   auth: {
-    clientId: process.env.REACT_APP_MSAL_CLIENT_ID || 'your-client-id-here',
+    clientId: import.meta.env.VITE_MSAL_CLIENT_ID || 'e71e69a8-07fd-4110-8d77-9e4326027969',
     authority: 'https://login.microsoftonline.com/common',
-    redirectUri: 'http://localhost:5173/', // Configured for port 5173
+    redirectUri: window.location.origin + '/auth/microsoft/callback', // Dynamic redirect URI
   },
   cache: {
     cacheLocation: 'sessionStorage',
@@ -26,7 +26,7 @@ export const graphConfig = {
 
 // Check if Microsoft authentication is properly configured
 export const isMicrosoftAuthConfigured = () => {
-  return process.env.REACT_APP_MSAL_CLIENT_ID && 
-         process.env.REACT_APP_MSAL_CLIENT_ID !== 'your-client-id-here' &&
-         process.env.REACT_APP_MSAL_CLIENT_ID !== 'demo-client-id';
+  return import.meta.env.VITE_MSAL_CLIENT_ID && 
+         import.meta.env.VITE_MSAL_CLIENT_ID !== 'your-client-id-here' &&
+         import.meta.env.VITE_MSAL_CLIENT_ID !== 'demo-client-id';
 };
