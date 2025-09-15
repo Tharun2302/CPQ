@@ -102,6 +102,34 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
     }
   };
 
+  // PKCE helpers for Microsoft OAuth (S256)
+  const generateRandomString = (length: number): string => {
+    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+    const randomValues = new Uint8Array(length);
+    window.crypto.getRandomValues(randomValues);
+    let result = '';
+    for (let i = 0; i < randomValues.length; i++) {
+      result += charset[randomValues[i] % charset.length];
+    }
+    return result;
+  };
+
+  const base64UrlEncode = (arrayBuffer: ArrayBuffer): string => {
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  };
+
+  const createCodeChallenge = async (verifier: string): Promise<string> => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(verifier);
+    const digest = await window.crypto.subtle.digest('SHA-256', data);
+    return base64UrlEncode(digest);
+  };
+
   const signup = async (userData: SignUpData): Promise<boolean> => {
     try {
       setLoading(true);
@@ -153,17 +181,23 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
       setLoading(true);
       
       // Simple Microsoft OAuth redirect (no complex libraries)
-      const clientId = import.meta.env.VITE_MSAL_CLIENT_ID || 'e71e69a8-07fd-4110-8d77-9e4326027969';
+      const clientId = import.meta.env.VITE_MSAL_CLIENT_ID as string;
       
-      if (!clientId || clientId === 'your-client-id-here') {
+      if (!clientId) {
         console.warn('Microsoft authentication is not configured - Client ID missing or invalid');
         return false;
       }
       
-      // Create Microsoft OAuth URL
-      const redirectUri = encodeURIComponent(window.location.origin + '/auth/microsoft/callback');
+      // Create Microsoft OAuth URL with PKCE
+      const redirectBase = (import.meta.env.VITE_MSAL_REDIRECT_URI as string) || (window.location.origin + '/auth/microsoft/callback');
+      const redirectUri = encodeURIComponent(redirectBase);
       const scopes = encodeURIComponent('openid profile email User.Read');
       const state = Math.random().toString(36).substring(2, 15);
+
+      // PKCE: generate code verifier and challenge
+      const codeVerifier = generateRandomString(64);
+      const codeChallenge = await createCodeChallenge(codeVerifier);
+      sessionStorage.setItem('ms_pkce_verifier', codeVerifier);
 
       const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
         `client_id=${clientId}&` +
@@ -172,6 +206,8 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
         `scope=${scopes}&` +
         `response_mode=query&` +
         `state=${state}&` +
+        `code_challenge=${encodeURIComponent(codeChallenge)}&` +
+        `code_challenge_method=S256&` +
         `prompt=select_account`;
       
       // Open popup window

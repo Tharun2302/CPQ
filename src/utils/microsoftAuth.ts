@@ -9,26 +9,57 @@ interface MicrosoftUser {
 }
 
 export class MicrosoftAuth {
-  private static readonly CLIENT_ID = process.env.REACT_APP_MSAL_CLIENT_ID || 'your-client-id-here';
-  private static readonly REDIRECT_URI = `${window.location.origin}/auth/microsoft/callback`;
+  private static readonly CLIENT_ID = (import.meta as any).env?.VITE_MSAL_CLIENT_ID as string;
+  private static readonly REDIRECT_URI = ((import.meta as any).env?.VITE_MSAL_REDIRECT_URI as string) || `${window.location.origin}/auth/microsoft/callback`;
   private static readonly SCOPES = 'openid profile email User.Read';
   private static readonly AUTHORITY = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize';
 
-  static isConfigured(): boolean {
-    return this.CLIENT_ID && 
-           this.CLIENT_ID !== 'your-client-id-here' &&
-           this.CLIENT_ID !== 'demo-client-id';
+  private static generateRandomString(length: number): string {
+    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+    const randomValues = new Uint8Array(length);
+    window.crypto.getRandomValues(randomValues);
+    let result = '';
+    for (let i = 0; i < randomValues.length; i++) {
+      result += charset[randomValues[i] % charset.length];
+    }
+    return result;
   }
 
-  static getAuthUrl(): string {
+  private static base64UrlEncode(arrayBuffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  }
+
+  private static async createCodeChallenge(verifier: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(verifier);
+    const digest = await window.crypto.subtle.digest('SHA-256', data);
+    return this.base64UrlEncode(digest);
+  }
+
+  static isConfigured(): boolean {
+    return Boolean(this.CLIENT_ID);
+  }
+
+  static async getAuthUrl(): Promise<string> {
+    const codeVerifier = this.generateRandomString(64);
+    const codeChallenge = await this.createCodeChallenge(codeVerifier);
+    sessionStorage.setItem('ms_pkce_verifier', codeVerifier);
+
     const params = new URLSearchParams({
       client_id: this.CLIENT_ID,
       response_type: 'code',
       redirect_uri: this.REDIRECT_URI,
       scope: this.SCOPES,
       response_mode: 'query',
-      state: this.generateState()
-    });
+      state: this.generateState(),
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256'
+    } as any);
 
     return `${this.AUTHORITY}?${params.toString()}`;
   }
@@ -79,45 +110,46 @@ export class MicrosoftAuth {
 
   static openAuthWindow(): Promise<MicrosoftUser | null> {
     return new Promise((resolve) => {
-      const authUrl = this.getAuthUrl();
-      const popup = window.open(
-        authUrl,
+      this.getAuthUrl().then((authUrl) => {
+        const popup = window.open(
+          authUrl,
         'microsoft-auth',
         'width=500,height=600,scrollbars=yes,resizable=yes'
-      );
+        );
 
-      if (!popup) {
-        console.error('Failed to open Microsoft auth popup');
-        resolve(null);
-        return;
-      }
-
-      // Listen for the popup to close or receive a message
-      const checkClosed = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(checkClosed);
+        if (!popup) {
+          console.error('Failed to open Microsoft auth popup');
           resolve(null);
+          return;
         }
-      }, 1000);
 
-      // Listen for messages from the popup
-      const messageListener = (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) return;
-        
-        if (event.data.type === 'MICROSOFT_AUTH_SUCCESS') {
-          clearInterval(checkClosed);
-          window.removeEventListener('message', messageListener);
-          popup.close();
-          resolve(event.data.user);
-        } else if (event.data.type === 'MICROSOFT_AUTH_ERROR') {
-          clearInterval(checkClosed);
-          window.removeEventListener('message', messageListener);
-          popup.close();
-          resolve(null);
-        }
-      };
+        // Listen for the popup to close or receive a message
+        const checkClosed = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(checkClosed);
+            resolve(null);
+          }
+        }, 1000);
 
-      window.addEventListener('message', messageListener);
+        // Listen for messages from the popup
+        const messageListener = (event: MessageEvent) => {
+          if (event.origin !== window.location.origin) return;
+          
+          if (event.data.type === 'MICROSOFT_AUTH_SUCCESS') {
+            clearInterval(checkClosed);
+            window.removeEventListener('message', messageListener);
+            popup.close();
+            resolve(event.data.user);
+          } else if (event.data.type === 'MICROSOFT_AUTH_ERROR') {
+            clearInterval(checkClosed);
+            window.removeEventListener('message', messageListener);
+            popup.close();
+            resolve(null);
+          }
+        };
+
+        window.addEventListener('message', messageListener);
+      });
     });
   }
 }
