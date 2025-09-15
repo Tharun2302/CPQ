@@ -1390,7 +1390,8 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
           formData.append('formId', template.id);
           formData.append('signatureType', 'user');
           
-          const uploadResponse = await fetch('http://localhost:3001/api/signature/upload-image', {
+          const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+          const uploadResponse = await fetch(`${backendUrl}/api/signature/upload-image`, {
             method: 'POST',
             body: formData
           });
@@ -1461,7 +1462,8 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
         }
       }
       
-      const formResponse = await fetch('http://localhost:3001/api/signature/create-form', {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const formResponse = await fetch(`${backendUrl}/api/signature/create-form`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1521,7 +1523,7 @@ CloudFuze Team`;
       console.log('📧 Sending email with processed template and signature form link...');
       
       // Send email with processed template and signature form link
-      const response = await fetch('http://localhost:3001/api/email/send', {
+      const response = await fetch(`${backendUrl}/api/email/send`, {
         method: 'POST',
         body: formData
       });
@@ -1611,27 +1613,6 @@ The client will receive an email with the processed template and a link to compl
         <h1 className="text-3xl font-bold text-gray-800 mb-2">Template Manager</h1>
         <p className="text-gray-600">Upload and manage your quote templates</p>
         
-        {/* DOCX Preferred Notice */}
-        <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg max-w-2xl mx-auto">
-          <div className="flex items-center justify-center gap-2 text-green-800">
-            <CheckCircle className="w-5 h-5" />
-            <span className="font-semibold">Recommended: Use DOCX templates for best results!</span>
-          </div>
-          <p className="text-sm text-green-700 mt-2">
-            DOCX templates provide reliable token replacement. PDF templates are supported but may have positioning issues.
-          </p>
-          <div className="mt-3">
-            <a 
-              href="/example-template.html" 
-              download="example-template.html"
-              className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 underline"
-            >
-              <Download className="w-4 h-4" />
-              Download Example Template (HTML)
-            </a>
-            <span className="text-xs text-gray-500 ml-2">Convert to DOCX format</span>
-          </div>
-      </div>
 
         {/* Storage Management */}
         <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg max-w-2xl mx-auto">

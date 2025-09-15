@@ -24,7 +24,7 @@ export interface TemplatesResponse {
 }
 
 class TemplateService {
-  private baseUrl = 'http://localhost:3001/api';
+  private baseUrl = import.meta.env.VITE_BACKEND_URL ? `${import.meta.env.VITE_BACKEND_URL}/api` : 'http://localhost:3001/api';
 
   // Upload template to database
   async uploadTemplate(file: File, name?: string, description?: string, isDefault: boolean = false): Promise<TemplateUploadResponse> {

@@ -27,6 +27,7 @@ export interface DocxTemplateData {
   '{{migration_price}}'?: string;
   '{{duration_months}}'?: string;
   '{{date}}'?: string;
+  '{{Effective Date}}'?: string;
   
   // Legacy fields for backward compatibility
   company?: string;
@@ -181,15 +182,15 @@ export class DocxTemplateProcessor {
       
       // Debug: Check specific tokens
       console.log('🎯 TOKEN CHECK:');
-      console.log('  {{Company Name}}:', processedData['{{Company Name}}']);
-      console.log('  {{Company_Name}}:', processedData['{{Company_Name}}']);
-      console.log('  {{users_count}}:', processedData['{{users_count}}']);
-      console.log('  {{users_cost}}:', processedData['{{users_cost}}']);
-      console.log('  {{Duration of months}}:', processedData['{{Duration of months}}']);
-      console.log('  {{Duration_of_months}}:', processedData['{{Duration_of_months}}']);
-      console.log('  {{total price}}:', processedData['{{total price}}']);
-      console.log('  {{total_price}}:', processedData['{{total_price}}']);
-      console.log('  {{price_migration}}:', processedData['{{price_migration}}']);
+      console.log('  Company Name:', processedData['{{Company Name}}']);
+      console.log('  Company_Name:', processedData['{{Company_Name}}']);
+      console.log('  users_count:', processedData['{{users_count}}']);
+      console.log('  users_cost:', processedData['{{users_cost}}']);
+      console.log('  Duration of months:', processedData['{{Duration of months}}']);
+      console.log('  Duration_of_months:', processedData['{{Duration_of_months}}']);
+      console.log('  total price:', processedData['{{total price}}']);
+      console.log('  total_price:', processedData['{{total_price}}']);
+      console.log('  price_migration:', processedData['{{price_migration}}']);
       
       // Replace tokens using the new API (setData is deprecated)
       console.log('🔍 About to render template with data using new API...');
@@ -390,7 +391,14 @@ export class DocxTemplateProcessor {
     const processedData: any = {};
     
     // Extract core values with fallbacks - EXACT tokens from template
+    console.log('🔍 DOCX PROCESSOR: Company name sources:');
+    console.log('  data[Company Name]:', data['{{Company Name}}']);
+    console.log('  data[Company_Name]:', data['{{Company_Name}}']);
+    console.log('  data[company name]:', data['{{company name}}']);
+    console.log('  data.company:', data.company);
+    
     const companyName = data['{{Company Name}}'] || data['{{Company_Name}}'] || data['{{company name}}'] || data.company || 'Demo Company Inc.';
+    console.log('  Final companyName in DOCX processor:', companyName);
     const userCount = data['{{users_count}}'] || data['{{userscount}}'] || data['{{users}}'] || '1';
     const userCost = data['{{users_cost}}'] || '$0.00';
     const duration = data['{{Duration of months}}'] || data['{{Duration_of_months}}'] || data['{{duration_months}}'] || '1';
@@ -399,7 +407,11 @@ export class DocxTemplateProcessor {
     const migrationType = data['{{migration type}}'] || data['{{migration_type}}'] || 'Content';
     const clientName = data['{{clientName}}'] || data.clientName || 'Demo Client';
     const email = data['{{email}}'] || data.email || 'demo@example.com';
-    const date = data['{{date}}'] || new Date().toLocaleDateString();
+    const date = data['{{date}}'] || new Date().toLocaleDateString('en-US', {
+      year: '2-digit',
+      month: '2-digit',
+      day: '2-digit'
+    });
     
     console.log('🔍 DOCX PROCESSOR EXTRACTED VALUES:');
     console.log('  companyName:', companyName);
@@ -444,12 +456,12 @@ export class DocxTemplateProcessor {
     
     // CRITICAL: Ensure the exact tokens from the template are mapped correctly
     console.log('🔍 EXACT TEMPLATE TOKEN MAPPING:');
-    console.log('  {{Company_Name}} →', companyName);
-    console.log('  {{users_count}} →', userCount);
-    console.log('  {{users_cost}} →', userCost);
-    console.log('  {{Duration_of_months}} →', duration);
-    console.log('  {{price_migration}} →', migrationCost);
-    console.log('  {{total_price}} →', totalPrice);
+    console.log('  Company_Name →', companyName);
+    console.log('  users_count →', userCount);
+    console.log('  users_cost →', userCost);
+    console.log('  Duration_of_months →', duration);
+    console.log('  price_migration →', migrationCost);
+    console.log('  total_price →', totalPrice);
     
     // Create comprehensive token mapping covering ALL possible variations
     const tokenMappings = {
@@ -479,6 +491,7 @@ export class DocxTemplateProcessor {
       // Duration variations
       '{{Duration of months}}': duration,
       '{{Duration_of_months}}': duration,  // CRITICAL: Underscore version found in template
+      '{{Suration_of_months}}': duration,  // Handle typo version
       '{{duration_months}}': duration,
       '{{duration}}': duration,
       '{{months}}': duration,
@@ -519,6 +532,10 @@ export class DocxTemplateProcessor {
       '{{date}}': date,
       '{{current_date}}': date,
       '{{today}}': date,
+      '{{Effective Date}}': date,
+      '{{effective_date}}': date,
+      '{{effectiveDate}}': date,
+      '{{Date}}': date,
       
       // Additional common tokens
       '{{price_data}}': data['{{price_data}}'] || '$0.00',

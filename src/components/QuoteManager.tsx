@@ -139,7 +139,7 @@ const QuoteManager: React.FC<QuoteManagerProps> = ({
     setLoadingSignatures(prev => ({ ...prev, [quoteId]: true }));
     
     try {
-      const response = await fetch(`http://localhost:3001/api/signature/forms-by-quote/${quoteId}`);
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/signature/forms-by-quote/${quoteId}`);
       if (response.ok) {
         const data = await response.json();
         setSignatureData(prev => ({ ...prev, [quoteId]: data.forms }));
@@ -839,7 +839,8 @@ CPQ Pro Solutions Team`
       console.log('📝 Creating digital signature form...');
       const quoteNumber = `CPQ-${quote.id.split('-')[1]}`;
       
-      const formResponse = await fetch('http://localhost:3001/api/signature/create-form', {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const formResponse = await fetch(`${backendUrl}/api/signature/create-form`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1028,7 +1029,7 @@ CPQ Pro Solutions Team`;
       console.log('📧 Sending email with PDF and signature form link...');
       
       // Send email with PDF and signature form link
-      const response = await fetch('http://localhost:3001/api/email/send', {
+      const response = await fetch(`${backendUrl}/api/email/send`, {
         method: 'POST',
         body: formData
       });

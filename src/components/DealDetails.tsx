@@ -22,6 +22,7 @@ interface DealData {
   stage?: string;
   ownerId?: string;
   company?: string;
+  companyByContact?: string;
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
@@ -42,6 +43,8 @@ const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh, onUseDea
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   console.log('🔍 DealDetails render - dealData:', dealData);
+  console.log('🔍 Company By Contact value:', dealData?.companyByContact);
+  console.log('🔍 Company By Contact exists?', !!dealData?.companyByContact);
 
   if (!dealData) {
     return (
@@ -211,7 +214,7 @@ const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh, onUseDea
       </div>
 
       {/* Enhanced Contact & Company Information */}
-      {(dealData.contactName || dealData.company) && (
+      {(dealData.contactName || dealData.companyByContact) && (
         <div className="mt-8">
           <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
             <UserCheck className="w-5 h-5 text-green-600" />
@@ -219,19 +222,6 @@ const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh, onUseDea
           </h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Company Name */}
-            {dealData.company && (
-              <div className="flex items-center p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-100">
-                <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center mr-4">
-                  <Building className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">Company Name</p>
-                  <p className="font-semibold text-gray-900 text-lg">{dealData.company}</p>
-                </div>
-              </div>
-            )}
-
             {/* Contact Name */}
             {dealData.contactName && (
               <div className="flex items-center p-4 bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl border border-teal-100">
@@ -254,6 +244,19 @@ const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh, onUseDea
                 <div>
                   <p className="text-sm text-gray-500 font-medium">Contact Email</p>
                   <p className="font-semibold text-gray-900 text-lg">{dealData.contactEmail}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Company Name (2) */}
+            {dealData.companyByContact && (
+              <div className="flex items-center p-4 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl border border-amber-100">
+                <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center mr-4">
+                  <Building className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">Company Name</p>
+                  <p className="font-semibold text-gray-900 text-lg">{dealData.companyByContact}</p>
                 </div>
               </div>
             )}

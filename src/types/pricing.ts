@@ -35,7 +35,7 @@ export interface ConfigurationData {
   instanceType: 'Small' | 'Standard' | 'Large' | 'Extra Large';
   numberOfInstances: number;
   duration: number;
-  migrationType: 'Content' | 'Email' | 'Messaging';
+  migrationType: 'Messaging';
   dataSizeGB: number;
 }
 

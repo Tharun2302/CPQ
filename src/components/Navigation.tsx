@@ -18,8 +18,6 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
     { id: 'quote', label: 'Quote', icon: FileText },
     { id: 'quotes', label: 'Quotes', icon: FileText },
     { id: 'templates', label: 'Templates', icon: Upload },
-    { id: 'hubspot', label: 'HubSpot', icon: MessageSquare },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 

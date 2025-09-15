@@ -52,7 +52,8 @@ const DigitalSignatureForm: React.FC<SignatureFormProps> = ({
     setInteractions(prev => [...prev, interaction]);
 
     try {
-      await fetch('http://localhost:3001/api/signature/track-interaction', {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      await fetch(`${backendUrl}/api/signature/track-interaction`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -167,7 +168,8 @@ const DigitalSignatureForm: React.FC<SignatureFormProps> = ({
     });
 
     try {
-      const response = await fetch('http://localhost:3001/api/signature/submit', {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const response = await fetch(`${backendUrl}/api/signature/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -39,7 +39,8 @@ const SignatureAnalytics: React.FC = () => {
   const fetchAnalytics = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('http://localhost:3001/api/signature/analytics');
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const response = await fetch(`${backendUrl}/api/signature/analytics`);
       
       if (response.ok) {
         const data = await response.json();

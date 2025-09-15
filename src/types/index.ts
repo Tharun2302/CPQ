@@ -60,7 +60,7 @@ export interface ConfigurationInputs {
   instanceType: 'Basic' | 'Standard' | 'Premium' | 'Enterprise';
   numberOfInstances: number;
   duration: number;
-  migrationType: 'Content' | 'Email' | 'Messaging';
+  migrationType: 'Messaging';
   dataSizeGB: number;
 }
 
