@@ -9,8 +9,10 @@ import {
   Loader2
 } from 'lucide-react';
 import { QuoteData, ClientDetails, ConfigurationInputs, UIState } from '../types';
-import { LocalStorageHelper, FormValidator } from '../utils/helpers';
-import { QuoteGenerator } from './QuoteGenerator';
+import { ConfigurationData, PricingCalculation } from '../types/pricing';
+import { LocalStorageHelper } from '../utils/helpers';
+import { calculatePricing, PRICING_TIERS } from '../utils/pricing';
+import QuoteGenerator from './QuoteGenerator';
 import { TemplateProcessor } from './TemplateProcessor';
 import { DocxTemplates } from './DocxTemplates';
 
@@ -43,7 +45,7 @@ export const MainApp: React.FC = () => {
     instanceType: 'Standard',
     numberOfInstances: 1,
     duration: 6,
-    migrationType: 'Email',
+    migrationType: 'Messaging',
     dataSizeGB: 10
   });
 
@@ -109,6 +111,28 @@ export const MainApp: React.FC = () => {
       success: null
     }));
   }, []);
+
+  // Convert ConfigurationInputs to ConfigurationData
+  const convertToConfigurationData = useCallback((config: ConfigurationInputs): ConfigurationData => {
+    const instanceTypeMap: Record<string, 'Small' | 'Standard' | 'Large' | 'Extra Large'> = {
+      'Basic': 'Small',
+      'Standard': 'Standard', 
+      'Premium': 'Large',
+      'Enterprise': 'Extra Large'
+    };
+
+    return {
+      ...config,
+      instanceType: instanceTypeMap[config.instanceType] || 'Standard'
+    };
+  }, []);
+
+  // Create pricing calculation
+  const pricingCalculation = useCallback((): PricingCalculation => {
+    const configData = convertToConfigurationData(configuration);
+    const tier = PRICING_TIERS[1]; // Use Standard tier by default
+    return calculatePricing(configData, tier);
+  }, [configuration, convertToConfigurationData]);
 
   const tabs = [
     { id: 'configure', label: 'Configure', icon: Settings },
@@ -342,11 +366,43 @@ export const MainApp: React.FC = () => {
 
         {uiState.activeTab === 'quote' && (
           <QuoteGenerator
-            clientDetails={clientDetails}
-            configuration={configuration}
-            onQuoteGenerated={handleQuoteGenerated}
-            onError={handleError}
-            onSuccess={handleSuccess}
+            calculation={pricingCalculation()}
+            configuration={convertToConfigurationData(configuration)}
+            onGenerateQuote={(quote) => {
+              // Convert Quote to QuoteData format
+              const quoteData: QuoteData = {
+                id: quote.id,
+                client: {
+                  companyName: quote.company,
+                  clientName: quote.clientName,
+                  clientEmail: quote.clientEmail
+                },
+                configuration: {
+                  numberOfUsers: quote.configuration.numberOfUsers,
+                  instanceType: quote.configuration.instanceType,
+                  numberOfInstances: quote.configuration.numberOfInstances,
+                  duration: quote.configuration.duration,
+                  migrationType: quote.configuration.migrationType,
+                  dataSizeGB: quote.configuration.dataSizeGB
+                },
+                costs: {
+                  userCost: quote.calculation.userCost,
+                  dataCost: quote.calculation.dataCost,
+                  migrationCost: quote.calculation.migrationCost,
+                  instanceCost: quote.calculation.instanceCost,
+                  totalCost: quote.calculation.totalCost
+                },
+                selectedPlan: {
+                  name: quote.selectedTier.name,
+                  price: quote.calculation.totalCost,
+                  features: quote.selectedTier.features
+                },
+                quoteId: quote.id,
+                generatedDate: quote.createdAt,
+                status: quote.status === 'viewed' ? 'sent' : quote.status
+              };
+              handleQuoteGenerated(quoteData);
+            }}
           />
         )}
 

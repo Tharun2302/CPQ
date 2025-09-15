@@ -32,59 +32,29 @@ async function initializeDatabase() {
   try {
     // Check if database connection is available
     console.log('🔍 Checking database connection...');
-    console.log('📊 Database config:', {
-      host: dbConfig.host,
-      user: dbConfig.user,
-      database: dbConfig.database,
-      port: dbConfig.port
+    console.log('📊 MongoDB config:', {
+      uri: MONGODB_URI,
+      database: DB_NAME
     });
     
-    // Test connection first
-    const connection = await pool.getConnection();
-    console.log('✅ Database connection successful');
-    connection.release();
+    // Connect to MongoDB
+    client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    db = client.db(DB_NAME);
+    console.log('✅ MongoDB connection successful');
     
-    // Create signature_forms table if it doesn't exist
-    await pool.execute(`
-      CREATE TABLE IF NOT EXISTS signature_forms (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        form_id VARCHAR(255) UNIQUE NOT NULL,
-        quote_id VARCHAR(255) NOT NULL,
-        client_email VARCHAR(255) NOT NULL,
-        client_name VARCHAR(255) NOT NULL,
-        quote_data JSON,
-        status ENUM('pending', 'completed', 'expired') DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        expires_at TIMESTAMP,
-        interactions JSON,
-        signature_data JSON,
-        approval_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-        user_signature_image LONGTEXT,
-        client_signature_image LONGTEXT,
-        INDEX idx_form_id (form_id),
-        INDEX idx_status (status),
-        INDEX idx_expires_at (expires_at)
-      )
-    `);
+    // Create signature_forms collection if it doesn't exist
+    const signatureFormsCollection = db.collection('signature_forms');
+    await signatureFormsCollection.createIndex({ form_id: 1 }, { unique: true });
+    await signatureFormsCollection.createIndex({ quote_id: 1 });
+    await signatureFormsCollection.createIndex({ status: 1 });
+    await signatureFormsCollection.createIndex({ expires_at: 1 });
     
-    // Create templates table if it doesn't exist
-    await pool.execute(`
-      CREATE TABLE IF NOT EXISTS templates (
-        id VARCHAR(255) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        description TEXT,
-        file_name VARCHAR(255) NOT NULL,
-        file_type VARCHAR(50) NOT NULL,
-        file_data LONGBLOB NOT NULL,
-        file_size INT NOT NULL,
-        is_default BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_file_type (file_type),
-        INDEX idx_is_default (is_default),
-        INDEX idx_created_at (created_at)
-      )
-    `);
+    // Create templates collection if it doesn't exist
+    const templatesCollection = db.collection('templates');
+    await templatesCollection.createIndex({ file_type: 1 });
+    await templatesCollection.createIndex({ is_default: 1 });
+    await templatesCollection.createIndex({ created_at: 1 });
     
     console.log('✅ Connected to MongoDB Atlas successfully');
     console.log('📊 Database name:', DB_NAME);
