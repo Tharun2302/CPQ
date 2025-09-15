@@ -13,7 +13,7 @@ This guide will help you deploy your CPQ Pro backend to Render with or without a
 ### Step 2: Configure Settings
 ```
 Name: cpq-backend
-Build Command: npm install
+Build Command: npm install && npm run build
 Start Command: node server.cjs
 ```
 
@@ -21,6 +21,7 @@ Start Command: node server.cjs
 ```
 HUBSPOT_API_KEY=pat-na1-635cc313-80cb-4701-810a-a0492691b28d
 PORT=10000
+VITE_MSAL_CLIENT_ID=your-microsoft-client-id-here
 ```
 
 ### Step 4: Deploy
@@ -54,7 +55,7 @@ PORT=10000
 ### Step 3: Configure Settings
 ```
 Name: cpq-backend
-Build Command: npm install
+Build Command: npm install && npm run build
 Start Command: node server.cjs
 ```
 
@@ -62,6 +63,7 @@ Start Command: node server.cjs
 ```
 HUBSPOT_API_KEY=pat-na1-635cc313-80cb-4701-810a-a0492691b28d
 PORT=10000
+VITE_MSAL_CLIENT_ID=your-microsoft-client-id-here
 DB_HOST=your-postgres-host.onrender.com
 DB_USER=your-postgres-user
 DB_PASSWORD=your-postgres-password
@@ -149,6 +151,7 @@ curl https://your-app-name.onrender.com/api/signature/debug
 | Variable | Required | Description | Example |
 |----------|----------|-------------|---------|
 | `HUBSPOT_API_KEY` | Yes | HubSpot API key | `pat-na1-...` |
+| `VITE_MSAL_CLIENT_ID` | Yes | Microsoft authentication client ID | `e71e69a8-07fd-4110-8d77-9e4326027969` |
 | `PORT` | No | Server port | `10000` |
 | `DB_HOST` | No* | Database host | `host.onrender.com` |
 | `DB_USER` | No* | Database user | `user` |
