@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { User, LogOut, Settings, ChevronDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const UserMenu: React.FC = () => {
   const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -55,7 +57,10 @@ const UserMenu: React.FC = () => {
           <button
             onClick={() => {
               setIsOpen(false);
-              // TODO: Navigate to settings page
+              navigate('/dashboard');
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('navigateToTab', { detail: 'settings' }));
+              }, 0);
             }}
             className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
           >

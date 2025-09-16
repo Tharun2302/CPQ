@@ -22,6 +22,7 @@ import LandingPage from './pages/LandingPage';
 import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
 import MicrosoftCallback from './pages/MicrosoftCallback';
+import DebugEnv from './pages/DebugEnv';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 function App() {
@@ -1398,6 +1399,7 @@ function App() {
           <Route path="/signin" element={<SignInPage />} />
           <Route path="/signup" element={<SignUpPage />} />
           <Route path="/auth/microsoft/callback" element={<MicrosoftCallback />} />
+          <Route path="/debug-env" element={<DebugEnv />} />
           
           {/* Protected Routes - Original CPQ App */}
           <Route path="/dashboard" element={
