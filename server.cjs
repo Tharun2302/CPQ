@@ -5,6 +5,8 @@ const nodemailer = require('nodemailer');
 const multer = require('multer');
 const path = require('path');
 const { MongoClient } = require('mongodb');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const app = express();
@@ -66,6 +68,13 @@ async function initializeDatabase() {
     await db.admin().ping();
     console.log('✅ MongoDB Atlas ping successful');
     
+    // Create users collection with proper indexes
+    const usersCollection = db.collection('users');
+    await usersCollection.createIndex({ email: 1 }, { unique: true });
+    await usersCollection.createIndex({ provider: 1 });
+    await usersCollection.createIndex({ created_at: -1 });
+    console.log('✅ Users collection ready with indexes');
+
     // Ensure collections exist
     const collections = ['signature_forms', 'quotes', 'templates', 'pricing_tiers'];
     for (const collectionName of collections) {
@@ -96,6 +105,7 @@ const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASS;
 const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
 const EMAIL_PORT = process.env.EMAIL_PORT || 587;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
 
 // Email configuration
 let transporter;
@@ -185,6 +195,261 @@ app.get('/api/database/health', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'MongoDB connection failed',
+      error: error.message
+    });
+  }
+});
+
+// Authentication endpoints
+
+// User registration
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(500).json({ 
+        success: false,
+        error: 'Database not available',
+        message: 'Cannot register users without database connection'
+      });
+    }
+
+    const { name, email, password } = req.body;
+    
+    // Validate input
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, email, and password are required'
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await db.collection('users').findOne({ email: email });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'User with this email already exists'
+      });
+    }
+
+    // Hash password
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Create user
+    const user = {
+      id: `user_${Date.now()}`,
+      name: name,
+      email: email,
+      password: hashedPassword,
+      provider: 'email',
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+
+    await db.collection('users').insertOne(user);
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Return user without password
+    const { password: _, ...userWithoutPassword } = user;
+
+    res.json({
+      success: true,
+      message: 'User registered successfully',
+      user: userWithoutPassword,
+      token: token
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to register user',
+      error: error.message
+    });
+  }
+});
+
+// User login
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(500).json({ 
+        success: false,
+        error: 'Database not available',
+        message: 'Cannot login without database connection'
+      });
+    }
+
+    const { email, password } = req.body;
+    
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required'
+      });
+    }
+
+    // Find user
+    const user = await db.collection('users').findOne({ email: email });
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    // Check password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Return user without password
+    const { password: _, ...userWithoutPassword } = user;
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      user: userWithoutPassword,
+      token: token
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to login',
+      error: error.message
+    });
+  }
+});
+
+// Get user by token
+app.get('/api/auth/me', async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(500).json({ 
+        success: false,
+        error: 'Database not available',
+        message: 'Cannot verify user without database connection'
+      });
+    }
+
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided'
+      });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await db.collection('users').findOne({ id: decoded.userId });
+    
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Return user without password
+    const { password: _, ...userWithoutPassword } = user;
+
+    res.json({
+      success: true,
+      user: userWithoutPassword
+    });
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Invalid token',
+      error: error.message
+    });
+  }
+});
+
+// Microsoft OAuth user creation/update
+app.post('/api/auth/microsoft', async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(500).json({ 
+        success: false,
+        error: 'Database not available',
+        message: 'Cannot process Microsoft auth without database connection'
+      });
+    }
+
+    const { id, name, email, accessToken } = req.body;
+    
+    // Check if user exists
+    let user = await db.collection('users').findOne({ email: email });
+    
+    if (user) {
+      // Update existing user
+      await db.collection('users').updateOne(
+        { email: email },
+        { 
+          $set: { 
+            name: name,
+            provider: 'microsoft',
+            updated_at: new Date()
+          }
+        }
+      );
+      user = await db.collection('users').findOne({ email: email });
+    } else {
+      // Create new user
+      user = {
+        id: id || `microsoft_${Date.now()}`,
+        name: name,
+        email: email,
+        provider: 'microsoft',
+        created_at: new Date(),
+        updated_at: new Date()
+      };
+      await db.collection('users').insertOne(user);
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Return user without password
+    const { password: _, ...userWithoutPassword } = user;
+
+    res.json({
+      success: true,
+      message: 'Microsoft authentication successful',
+      user: userWithoutPassword,
+      token: token
+    });
+  } catch (error) {
+    console.error('Microsoft auth error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process Microsoft authentication',
       error: error.message
     });
   }
@@ -1042,6 +1307,10 @@ app.listen(PORT, () => {
       console.log(`   - GET  /api/health`);
       console.log(`   - GET  /api/database/health`);
       console.log(`   - GET  /api/test-mongodb`);
+      console.log(`   - POST /api/auth/register`);
+      console.log(`   - POST /api/auth/login`);
+      console.log(`   - GET  /api/auth/me`);
+      console.log(`   - POST /api/auth/microsoft`);
       console.log(`   - GET  /api/quotes`);
       console.log(`   - POST /api/quotes`);
       console.log(`   - PUT  /api/quotes/:id`);

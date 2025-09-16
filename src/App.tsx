@@ -1399,6 +1399,7 @@ function App() {
           <Route path="/signin" element={<SignInPage />} />
           <Route path="/signup" element={<SignUpPage />} />
           <Route path="/auth/microsoft/callback" element={<MicrosoftCallback />} />
+          <Route path="/auth/microsoft/callback/" element={<MicrosoftCallback />} />
           <Route path="/debug-env" element={<DebugEnv />} />
           
           {/* Protected Routes - Original CPQ App */}

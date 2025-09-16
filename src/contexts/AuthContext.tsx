@@ -44,15 +44,43 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
 
   // Check for existing authentication on app load
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       try {
         const storedUser = localStorage.getItem('cpq_user');
         const storedToken = localStorage.getItem('cpq_token');
         
         if (storedUser && storedToken) {
-          const userData = JSON.parse(storedUser);
-          setUser(userData);
-          setIsAuthenticated(true);
+          // Verify token with backend
+          const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+          try {
+            const response = await fetch(`${backendUrl}/api/auth/me`, {
+              headers: {
+                'Authorization': `Bearer ${storedToken}`
+              }
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success) {
+                setUser(data.user);
+                setIsAuthenticated(true);
+              } else {
+                // Token invalid, clear storage
+                localStorage.removeItem('cpq_user');
+                localStorage.removeItem('cpq_token');
+              }
+            } else {
+              // Token invalid, clear storage
+              localStorage.removeItem('cpq_user');
+              localStorage.removeItem('cpq_token');
+            }
+          } catch (backendError) {
+            console.error('Backend auth check failed:', backendError);
+            // Fallback to local storage if backend is down
+            const userData = JSON.parse(storedUser);
+            setUser(userData);
+            setIsAuthenticated(true);
+          }
         }
       } catch (error) {
         console.error('Error checking authentication:', error);
@@ -71,29 +99,32 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
     try {
       setLoading(true);
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Check if user exists and password matches
-      const user = mockUsers.find(u => u.email === email);
-      const correctPassword = mockPasswords[email];
-      
-      if (user && correctPassword === password) {
-        // Generate simple token (timestamp)
-        const token = Date.now().toString();
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const response = await fetch(`${backendUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
         
-        // Store in localStorage
-        localStorage.setItem('cpq_user', JSON.stringify(user));
-        localStorage.setItem('cpq_token', token);
-        
-        // Update state
-        setUser(user);
-        setIsAuthenticated(true);
-        
-        return true;
-      } else {
-        return false;
+        if (data.success) {
+          // Store user and token
+          localStorage.setItem('cpq_user', JSON.stringify(data.user));
+          localStorage.setItem('cpq_token', data.token);
+          
+          // Update state
+          setUser(data.user);
+          setIsAuthenticated(true);
+          
+          return true;
+        }
       }
+      
+      return false;
     } catch (error) {
       console.error('Login error:', error);
       return false;
@@ -134,40 +165,36 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
     try {
       setLoading(true);
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Check if email already exists
-      const existingUser = mockUsers.find(u => u.email === userData.email);
-      if (existingUser) {
-        return false;
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const response = await fetch(`${backendUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: userData.name,
+          email: userData.email,
+          password: userData.password
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.success) {
+          // Store user and token
+          localStorage.setItem('cpq_user', JSON.stringify(data.user));
+          localStorage.setItem('cpq_token', data.token);
+          
+          // Update state
+          setUser(data.user);
+          setIsAuthenticated(true);
+          
+          return true;
+        }
       }
       
-      // Create new user
-      const newUser: User = {
-        id: `user_${Date.now()}`,
-        name: userData.name,
-        email: userData.email,
-          provider: 'email' as AuthProviderType,
-        createdAt: new Date().toISOString()
-      };
-      
-      // Add to mock database
-      mockUsers.push(newUser);
-      mockPasswords[userData.email] = userData.password;
-      
-      // Generate token
-      const token = Date.now().toString();
-      
-      // Store in localStorage
-      localStorage.setItem('cpq_user', JSON.stringify(newUser));
-      localStorage.setItem('cpq_token', token);
-      
-      // Update state
-      setUser(newUser);
-      setIsAuthenticated(true);
-      
-      return true;
+      return false;
     } catch (error) {
       console.error('Signup error:', error);
       return false;
@@ -179,9 +206,11 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
   const loginWithMicrosoft = async (): Promise<boolean> => {
     try {
       setLoading(true);
+      console.log('🚀 Starting Microsoft sign-in...');
       
       // Simple Microsoft OAuth redirect (no complex libraries)
       const clientId = import.meta.env.VITE_MSAL_CLIENT_ID as string;
+      console.log('🔑 Client ID:', clientId ? 'Found' : 'Missing');
       
       if (!clientId) {
         console.warn('Microsoft authentication is not configured - Client ID missing or invalid');
@@ -191,13 +220,14 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
       // Create Microsoft OAuth URL with PKCE
       const redirectBase = (import.meta.env.VITE_MSAL_REDIRECT_URI as string) || (window.location.origin + '/auth/microsoft/callback');
       const redirectUri = encodeURIComponent(redirectBase);
-      const scopes = encodeURIComponent('openid profile email User.Read');
+      const scopes = encodeURIComponent('openid profile email offline_access https://graph.microsoft.com/User.Read');
       const state = Math.random().toString(36).substring(2, 15);
 
       // PKCE: generate code verifier and challenge
       const codeVerifier = generateRandomString(64);
       const codeChallenge = await createCodeChallenge(codeVerifier);
-      sessionStorage.setItem('ms_pkce_verifier', codeVerifier);
+      // Use localStorage so the popup callback window can access it
+      localStorage.setItem('msal_code_verifier', codeVerifier);
 
       const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
         `client_id=${clientId}&` +
@@ -209,6 +239,12 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
         `code_challenge=${encodeURIComponent(codeChallenge)}&` +
         `code_challenge_method=S256&` +
         `prompt=select_account`;
+
+      console.log('🌐 Microsoft OAuth URL:', authUrl);
+      console.log('🔗 Redirect URI:', redirectBase);
+
+      // Store client ID for callback page (in localStorage for cross-window access)
+      localStorage.setItem('msal_client_id', clientId);
       
       // Open popup window
       const popup = window.open(
@@ -216,6 +252,8 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
         'microsoft-auth',
         'width=500,height=600,scrollbars=yes,resizable=yes'
       );
+      
+      console.log('🪟 Popup window opened:', popup ? 'Success' : 'Failed');
       
       if (!popup) {
         console.error('Failed to open Microsoft auth popup - popup blocked or failed');
@@ -225,47 +263,100 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
       
       // Wait for popup to close or receive message
       return new Promise((resolve) => {
+        console.log('⏳ Waiting for popup to close or receive message...');
+        
         const checkClosed = setInterval(() => {
           if (popup.closed) {
+            console.log('🪟 Popup window closed');
             clearInterval(checkClosed);
             resolve(false);
           }
         }, 1000);
         
         // Listen for messages from popup
-        const messageListener = (event: MessageEvent) => {
+        const messageListener = async (event: MessageEvent) => {
+          console.log('📨 Message received from popup:', event.data);
+          
           if (event.origin !== window.location.origin) {
+            console.log('❌ Message from wrong origin:', event.origin);
             return;
           }
           
           if (event.data.type === 'MICROSOFT_AUTH_SUCCESS') {
+            console.log('✅ Microsoft auth success! User data:', event.data.user);
+            
+            // Check if there was an error stored in localStorage
+            const storedError = localStorage.getItem('microsoft_auth_error');
+            if (storedError) {
+              const errorDetails = JSON.parse(storedError);
+              console.error('🚨 Microsoft Graph API Error Details:', errorDetails);
+              console.error('🚨 Full Error Message:', errorDetails.fullError);
+              console.error('🚨 Error Stack:', errorDetails.stack);
+              localStorage.removeItem('microsoft_auth_error'); // Clean up
+            }
+            
             clearInterval(checkClosed);
             window.removeEventListener('message', messageListener);
             popup.close();
             
-            // Create user from Microsoft account
+            // Send Microsoft user data to backend
             const microsoftUser = event.data.user;
-            const user: User = {
-              id: microsoftUser.id,
-              name: microsoftUser.name,
-              email: microsoftUser.email,
-              provider: 'microsoft' as AuthProviderType,
-              createdAt: new Date().toISOString()
-            };
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
             
-            // Check if user already exists, if not add them
-            const existingUser = mockUsers.find(u => u.email === user.email);
-            if (!existingUser) {
-              mockUsers.push(user);
+            try {
+              const response = await fetch(`${backendUrl}/api/auth/microsoft`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  id: microsoftUser.id,
+                  name: microsoftUser.name,
+                  email: microsoftUser.email,
+                  accessToken: microsoftUser.accessToken
+                })
+              });
+
+              if (response.ok) {
+                const data = await response.json();
+                
+                if (data.success) {
+                  // Store user and token from backend
+                  localStorage.setItem('cpq_user', JSON.stringify(data.user));
+                  localStorage.setItem('cpq_token', data.token);
+                  
+                  // Update state
+                  setUser(data.user);
+                  setIsAuthenticated(true);
+                } else {
+                  throw new Error('Backend Microsoft auth failed');
+                }
+              } else {
+                throw new Error('Backend Microsoft auth failed');
+              }
+            } catch (backendError) {
+              console.error('Backend Microsoft auth error:', backendError);
+              // Fallback to local storage if backend fails
+              const user: User = {
+                id: microsoftUser.id,
+                name: microsoftUser.name,
+                email: microsoftUser.email,
+                provider: 'microsoft' as AuthProviderType,
+                createdAt: new Date().toISOString()
+              };
+              
+              localStorage.setItem('cpq_user', JSON.stringify(user));
+              localStorage.setItem('cpq_token', microsoftUser.accessToken);
+              
+              setUser(user);
+              setIsAuthenticated(true);
             }
             
-            // Store in localStorage
-            localStorage.setItem('cpq_user', JSON.stringify(user));
-            localStorage.setItem('cpq_token', microsoftUser.accessToken);
-            
-            // Update state
-            setUser(user);
-            setIsAuthenticated(true);
+            // Cleanup PKCE artifacts
+            try {
+              localStorage.removeItem('msal_code_verifier');
+              localStorage.removeItem('msal_client_id');
+            } catch (_) {}
             
             resolve(true);
           } else if (event.data.type === 'MICROSOFT_AUTH_ERROR') {
@@ -273,6 +364,11 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
             window.removeEventListener('message', messageListener);
             popup.close();
             console.error('Microsoft authentication error:', event.data.error);
+            // Cleanup PKCE artifacts on error
+            try {
+              localStorage.removeItem('msal_code_verifier');
+              localStorage.removeItem('msal_client_id');
+            } catch (_) {}
             resolve(false);
           }
         };

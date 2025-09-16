@@ -45,6 +45,9 @@ HUBSPOT_ACCESS_TOKEN=your-hubspot-token-here
 # Port for your backend server
 PORT=3001
 
+# JWT Secret for authentication tokens (CHANGE IN PRODUCTION!)
+JWT_SECRET=your-super-secret-jwt-key-change-in-production
+
 # ===========================================
 # DEVELOPMENT vs PRODUCTION
 # ===========================================

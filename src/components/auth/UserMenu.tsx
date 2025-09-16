@@ -40,7 +40,10 @@ const UserMenu: React.FC = () => {
         <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
           <User className="w-5 h-5 text-white" />
         </div>
-        <span className="hidden sm:block font-medium">{user.name}</span>
+        <div className="hidden sm:flex flex-col text-left leading-tight">
+          <span className="font-medium">{user.name}</span>
+          <span className="text-xs text-gray-500">{user.email}</span>
+        </div>
         <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
