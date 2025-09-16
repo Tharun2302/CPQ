@@ -52,6 +52,8 @@ export const DEFAULT_TOKEN_PATTERNS: TokenPattern[] = [
     patterns: [
       '{company name}',
       '{{company name}}',
+      '{{Company Name}}', // Exact case from template
+      '{{Company_Name}}', // Underscore version from template
       'company name',
       'Company Name',
       '{company}',

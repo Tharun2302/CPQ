@@ -935,6 +935,14 @@ Total Price: {{total price}}`;
         
         const companyName = configureContactInfo?.company || quoteData.company || clientInfo.company || dealData?.companyByContact || dealData?.company || 'Demo Company Inc.';
         console.log('  Final companyName:', companyName);
+        
+        // CRITICAL: Additional fallback if company name is still undefined or empty
+        let finalCompanyName = companyName;
+        if (!finalCompanyName || finalCompanyName === 'undefined' || finalCompanyName === '' || finalCompanyName === 'null') {
+          console.warn('⚠️ Company name is still undefined/empty, using fallback');
+          finalCompanyName = 'Demo Company Inc.';
+        }
+        console.log('  Final finalCompanyName:', finalCompanyName);
         const userCount = quoteData.configuration?.numberOfUsers || 1;
         const userCost = quoteData.calculation?.userCost || 0;
         const migrationCost = quoteData.calculation?.migrationCost || 0;
@@ -1008,8 +1016,10 @@ Total Price: {{total price}}`;
         // Based on the template images you provided
         const templateData: Record<string, string> = {
           // EXACT tokens from your template (matching the DOCX file exactly)
-          '{{Company Name}}': companyName || 'Demo Company Inc.',
-          '{{Company_Name}}': companyName || 'Demo Company Inc.', // Underscore version found in template
+          '{{Company Name}}': finalCompanyName || 'Demo Company Inc.',
+          '{{ Company Name }}': finalCompanyName || 'Demo Company Inc.', // Space version with extra spaces (from third page)
+          '{{Company_Name}}': finalCompanyName || 'Demo Company Inc.', // Underscore version found in template
+          '{{ Company_Name }}': finalCompanyName || 'Demo Company Inc.', // Underscore version with extra spaces (from third page)
           '{{users_count}}': (userCount || 1).toString(),
           '{{users_cost}}': formatCurrency(userCost || 0), // FIXED: Template uses underscore, not dot
           '{{Duration of months}}': (duration || 1).toString(),
@@ -1020,7 +1030,7 @@ Total Price: {{total price}}`;
           '{{price_migration}}': formatCurrency(migrationCost || 0),
           
           // Additional common tokens for compatibility
-          '{{company name}}': companyName || 'Demo Company Inc.', // Lowercase version found in template
+          '{{company name}}': finalCompanyName || 'Demo Company Inc.', // Lowercase version found in template
           '{{migration type}}': migrationType || 'Content',
           '{{userscount}}': (userCount || 1).toString(),
           '{{price_data}}': formatCurrency(quoteData.calculation?.dataCost || 0),
@@ -1117,7 +1127,7 @@ Total Price: {{total price}}`;
         }
         
         // CRITICAL: Final check - ensure key tokens are not undefined
-        const criticalTokens = ['{{Company Name}}', '{{Company_Name}}', '{{users_count}}', '{{users_cost}}', '{{Duration of months}}', '{{Duration_of_months}}', '{{total price}}', '{{total_price}}', '{{price_migration}}', '{{company name}}', '{{Date}}'];
+        const criticalTokens = ['{{Company Name}}', '{{ Company Name }}', '{{Company_Name}}', '{{ Company_Name }}', '{{users_count}}', '{{users_cost}}', '{{Duration of months}}', '{{Duration_of_months}}', '{{total price}}', '{{total_price}}', '{{price_migration}}', '{{company name}}', '{{Date}}'];
         const criticalIssues = criticalTokens.filter(token => 
           !templateData[token] || templateData[token] === 'undefined' || templateData[token] === ''
         );
@@ -1129,8 +1139,8 @@ Total Price: {{total price}}`;
           // CRITICAL: Force fix any remaining undefined values
           criticalIssues.forEach(token => {
             console.log(`🔧 FORCE FIXING: ${token}`);
-            if (token === '{{Company Name}}' || token === '{{Company_Name}}') {
-              templateData[token] = companyName || 'Demo Company Inc.';
+            if (token === '{{Company Name}}' || token === '{{ Company Name }}' || token === '{{Company_Name}}' || token === '{{ Company_Name }}') {
+              templateData[token] = finalCompanyName || 'Demo Company Inc.';
             } else if (token === '{{users_count}}') {
               templateData[token] = (userCount || 1).toString();
             } else if (token === '{{users_cost}}') {
@@ -1142,7 +1152,7 @@ Total Price: {{total price}}`;
             } else if (token === '{{price_migration}}') {
               templateData[token] = formatCurrency(migrationCost || 0);
             } else if (token === '{{company name}}') {
-              templateData[token] = companyName || 'Demo Company Inc.';
+              templateData[token] = finalCompanyName || 'Demo Company Inc.';
             } else if (token === '{{Date}}') {
               templateData[token] = new Date().toLocaleDateString('en-US', {
                 year: '2-digit', 
@@ -1159,7 +1169,9 @@ Total Price: {{total price}}`;
         // CRITICAL: Show the exact values being sent for the key tokens
         console.log('🎯 FINAL TOKEN VALUES BEING SENT:');
         console.log('  Company Name:', templateData['{{Company Name}}']);
+        console.log('  Company Name (spaces):', templateData['{{ Company Name }}']);
         console.log('  Company_Name:', templateData['{{Company_Name}}']);
+        console.log('  Company_Name (spaces):', templateData['{{ Company_Name }}']);
         console.log('  users_count:', templateData['{{users_count}}']);
         console.log('  users_cost:', templateData['{{users_cost}}']);
         console.log('  Duration of months:', templateData['{{Duration of months}}']);
@@ -1238,6 +1250,16 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
         console.log('  Template data values:', Object.values(templateData));
         
         // Critical tokens validation already performed earlier in the code
+        
+        // CRITICAL: Log the exact templateData being sent to DOCX processor
+        console.log('🎯 SENDING TO DOCX PROCESSOR:');
+        console.log('  templateData keys:', Object.keys(templateData));
+        console.log('  templateData.{{Company Name}}:', templateData['{{Company Name}}']);
+        console.log('  templateData.{{ Company Name }}:', templateData['{{ Company Name }}']);
+        console.log('  templateData.{{Company_Name}}:', templateData['{{Company_Name}}']);
+        console.log('  templateData.{{ Company_Name }}:', templateData['{{ Company_Name }}']);
+        console.log('  templateData.{{company name}}:', templateData['{{company name}}']);
+        console.log('  templateData.{{company_name}}:', templateData['{{company_name}}']);
         
         const result = await DocxTemplateProcessor.processDocxTemplate(
           selectedTemplate.file,

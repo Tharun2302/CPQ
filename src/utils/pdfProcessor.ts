@@ -101,6 +101,12 @@ export function createPlaceholderMap(quoteData: QuoteData): PlaceholderMap {
     'clientEmail': quoteData.clientEmail,
     'company': quoteData.company,
     
+    // CRITICAL: Add specific token formats for DOCX templates
+    'Company Name': quoteData.company,
+    'Company_Name': quoteData.company,
+    'company name': quoteData.company,
+    'company_name': quoteData.company,
+    
     // Quote Information
     'quoteId': quoteData.id,
     'quoteNumber': `CPQ-001`,
@@ -114,12 +120,28 @@ export function createPlaceholderMap(quoteData: QuoteData): PlaceholderMap {
     'migrationType': quoteData.configuration.migrationType,
     'dataSizeGB': quoteData.configuration.dataSizeGB,
     
+    // CRITICAL: Add specific token formats for DOCX templates
+    'users_count': quoteData.configuration.numberOfUsers.toString(),
+    'userscount': quoteData.configuration.numberOfUsers.toString(),
+    'users': quoteData.configuration.numberOfUsers.toString(),
+    'Duration of months': quoteData.configuration.duration.toString(),
+    'Duration_of_months': quoteData.configuration.duration.toString(),
+    'duration_months': quoteData.configuration.duration.toString(),
+    
     // Pricing
     'userCost': formatCurrency(quoteData.calculation.userCost),
     'dataCost': formatCurrency(quoteData.calculation.dataCost),
     'migrationCost': formatCurrency(quoteData.calculation.migrationCost),
     'instanceCost': formatCurrency(quoteData.calculation.instanceCost),
     'totalCost': formatCurrency(quoteData.calculation.totalCost),
+    
+    // CRITICAL: Add specific token formats for DOCX templates
+    'users_cost': formatCurrency(quoteData.calculation.userCost),
+    'price_migration': formatCurrency(quoteData.calculation.migrationCost),
+    'migration_price': formatCurrency(quoteData.calculation.migrationCost),
+    'total price': formatCurrency(quoteData.calculation.totalCost),
+    'total_price': formatCurrency(quoteData.calculation.totalCost),
+    'prices': formatCurrency(quoteData.calculation.totalCost),
     
     // Plan Information
     'planName': quoteData.calculation.tier.name,

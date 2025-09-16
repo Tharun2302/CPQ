@@ -1998,6 +1998,8 @@ const extractQuoteValues = (quote: Quote) => {
     'Company Name': quote.company || 'Company Name',
     'company name': quote.company || 'Company Name', // Added lowercase version
     'comp': quote.company || 'Company Name', // Added for {{ comp }} format
+    '{{Company Name}}': quote.company || 'Company Name', // Exact token format
+    '{{Company_Name}}': quote.company || 'Company Name', // Underscore version from template
     'migration type': quote.configuration.migrationType,
     'userscount': quote.configuration.numberOfUsers.toString(),
     'price_migration': formatCurrency(quote.calculation.migrationCost),
@@ -2147,6 +2149,61 @@ export const mergeQuoteWithPlaceholders = async (
 };
 
 /**
+ * Fallback company name replacement for page 3
+ */
+const fallbackCompanyNameReplacement = async (
+  page: PDFPage,
+  values: any,
+  pageWidth: number,
+  pageHeight: number,
+  helveticaBold: any
+) => {
+  console.log('🔄 Page 3: Using fallback company name replacement...');
+  
+  const companyName = values['{{Company Name}}'] || values['{{Company_Name}}'] || values['Company Name'] || values['company name'] || values['company_name'] || values['comp'];
+  
+  console.log('🏢 Page 3 Fallback: Company name:', companyName);
+  
+  if (companyName && companyName !== 'Company Name') {
+    // Use multiple position attempts to ensure the token is found and replaced
+    const positions = [
+      { x: 300, y: pageHeight - 140, width: 250, height: 25 }, // Primary position
+      { x: 320, y: pageHeight - 135, width: 200, height: 20 }, // Alternative position 1
+      { x: 280, y: pageHeight - 145, width: 300, height: 30 }, // Alternative position 2
+      { x: 350, y: pageHeight - 130, width: 180, height: 20 }, // Alternative position 3
+    ];
+    
+    for (let i = 0; i < positions.length; i++) {
+      const pos = positions[i];
+      console.log(`🏢 Page 3 Fallback: Attempting replacement at position ${i + 1}: (${pos.x}, ${pos.y})`);
+      
+      // Draw white rectangle to cover the token area
+      page.drawRectangle({
+        x: pos.x,
+        y: pos.y,
+        width: pos.width,
+        height: pos.height,
+        color: rgb(1, 1, 1), // White background
+      });
+      
+      // Draw the company name
+      const formattedCompanyName = `For ${companyName}`;
+      page.drawText(formattedCompanyName, {
+        x: pos.x + 5, // Small offset from edge
+        y: pos.y + 5, // Small offset from edge
+        size: 12,
+        font: helveticaBold,
+        color: rgb(0, 0, 0), // Black text
+      });
+    }
+    
+    console.log(`✅ Page 3 Fallback: Company name replacement completed with "${companyName}" at ${positions.length} positions`);
+  } else {
+    console.warn('⚠️ Page 3 Fallback: No valid company name found for replacement');
+  }
+};
+
+/**
  * Replaces placeholders in an existing PDF page
  * @param page - The PDF page to process
  * @param values - The extracted values to use for replacement
@@ -2186,43 +2243,110 @@ const replacePlaceholdersInExistingPage = async (
     // Other pages - just replace specific placeholders
     console.log('🔄 Replacing placeholders on existing page content...');
     
-    // Replace {{ company name }} placeholder on page 3 (index 2)
+    // For page 3 (index 2), use the proper token replacement system
+    // This ensures the token is actually found and replaced at its real position
     if (pageIndex === 2) {
-      // Based on the image, the placeholder [[company name]] is in the right column of signatory details
-      // "For CloudFuze, Inc." is on the left, and company name should replace the placeholder on the right
-      const companyName = values['company name'] || values['Company Name'];
+      console.log('🔄 Page 3: Using proper token replacement system...');
       
-      // The placeholder is in the signatory details section, right column
-      // Position it exactly where the [[company name]] placeholder appears
-      const rightColumnTitleY = pageHeight - 140; // Position for right column title
-      
-      // Draw a larger white rectangle to completely cover the placeholder area
-      page.drawRectangle({
-        x: 320, // Start position to cover the placeholder
-        y: rightColumnTitleY - 5,
-        width: 250, // Wider to ensure complete coverage
-        height: 25, // Taller to ensure complete coverage
-        color: rgb(1, 1, 1), // White background
-      });
-      
-      // Draw the company name at the exact placeholder position with proper format
-      const formattedCompanyName = `For ${companyName}, Inc.`;
-      page.drawText(formattedCompanyName, {
-        x: 300, // Moved to the left side
-        y: rightColumnTitleY,
-        size: 12, // Decreased font size
-        font: helveticaBold, // Bold font for title
-        color: rgb(0, 0, 0), // Black color to match the template
-      });
-      
-      // Draw underline to match the left side "For CloudFuze, Inc." format
-      const textWidth = helveticaBold.widthOfTextAtSize(formattedCompanyName, 12);
-      page.drawLine({
-        start: { x: 300, y: rightColumnTitleY - 5 },
-        end: { x: 300 + textWidth, y: rightColumnTitleY - 5 },
-        thickness: 1,
-        color: rgb(0, 0, 0), // Black underline
-      });
+      try {
+        // Import the token replacement system
+        const { replaceTokensInPDF } = await import('./tokenReplacer');
+        const { findTokenPositions } = await import('./tokenFinder');
+        
+        // Create a temporary PDF with just this page for token replacement
+        const tempPDF = await PDFDocument.create();
+        const [copiedPage] = await tempPDF.copyPages(await PDFDocument.load(await quote.pdfDoc.save()), [pageIndex]);
+        tempPDF.addPage(copiedPage);
+        
+        // Convert quote data to the format expected by token replacer
+        const tokenReplacerQuoteData = {
+          id: quote.id || 'temp',
+          clientName: quote.clientName || 'Client Name',
+          clientEmail: quote.clientEmail || 'client@email.com',
+          company: quote.company || 'Company Name',
+          configuration: {
+            numberOfUsers: quote.configuration.numberOfUsers || 1,
+            instanceType: quote.configuration.instanceType || 'Standard',
+            numberOfInstances: quote.configuration.numberOfInstances || 1,
+            duration: quote.configuration.duration || 1,
+            migrationType: quote.configuration.migrationType || 'Email',
+            dataSizeGB: quote.configuration.dataSizeGB || 1
+          },
+          calculation: {
+            totalCost: quote.calculation.totalCost || 0,
+            migrationCost: quote.calculation.migrationCost || 0,
+            dataCost: quote.calculation.dataCost || 0,
+            instanceCost: quote.calculation.instanceCost || 0,
+            userCost: quote.calculation.userCost || 0,
+            tier: quote.calculation.tier || { name: 'Standard' }
+          },
+          createdAt: new Date()
+        };
+        
+        console.log('🏢 Page 3: Company name for token replacement:', tokenReplacerQuoteData.company);
+        
+        // First, let's check if tokens are found in this page
+        const tempPDFBytes = await tempPDF.save();
+        const tokenSearchResult = await findTokenPositions(tempPDFBytes);
+        
+        console.log('🔍 Page 3: Token search result:', {
+          success: tokenSearchResult.success,
+          totalTokens: tokenSearchResult.totalTokens,
+          tokens: tokenSearchResult.tokens?.map(t => ({ token: t.token, page: t.pageIndex + 1, position: `(${t.x}, ${t.y})` }))
+        });
+        
+        if (tokenSearchResult.success && tokenSearchResult.totalTokens > 0) {
+          // Apply token replacement to this page
+          const tokenResult = await replaceTokensInPDF(tempPDFBytes, tokenReplacerQuoteData);
+          
+          console.log('🔄 Page 3: Token replacement result:', {
+            success: tokenResult.success,
+            replacedCount: tokenResult.replacedCount,
+            totalTokens: tokenResult.totalTokens
+          });
+          
+          if (tokenResult.success && tokenResult.processedPDF) {
+            // Load the processed page and copy it back
+            const processedPDF = await PDFDocument.load(await tokenResult.processedPDF.arrayBuffer());
+            const [processedPage] = await processedPDF.getPages();
+            
+            // Clear the current page and copy the processed content
+            page.drawRectangle({
+              x: 0,
+              y: 0,
+              width: pageWidth,
+              height: pageHeight,
+              color: rgb(1, 1, 1), // White background
+            });
+            
+            // Copy the processed page content
+            const { width: processedWidth, height: processedHeight } = processedPage.getSize();
+            const scaleX = pageWidth / processedWidth;
+            const scaleY = pageHeight / processedHeight;
+            const scale = Math.min(scaleX, scaleY);
+            
+            page.drawPage(processedPage, {
+              x: (pageWidth - processedWidth * scale) / 2,
+              y: (pageHeight - processedHeight * scale) / 2,
+              xScale: scale,
+              yScale: scale
+            });
+            
+            console.log(`✅ Page 3: Token replacement completed - ${tokenResult.replacedCount} tokens replaced`);
+          } else {
+            console.warn('⚠️ Page 3: Token replacement failed, using fallback approach');
+            await fallbackCompanyNameReplacement(page, values, pageWidth, pageHeight, helveticaBold);
+          }
+        } else {
+          console.warn('⚠️ Page 3: No tokens found in page, using fallback approach');
+          await fallbackCompanyNameReplacement(page, values, pageWidth, pageHeight, helveticaBold);
+        }
+        
+      } catch (error) {
+        console.error('❌ Page 3: Error in token replacement system:', error);
+        console.log('🔄 Page 3: Using fallback approach...');
+        await fallbackCompanyNameReplacement(page, values, pageWidth, pageHeight, helveticaBold);
+      }
       
       // Add signature data to the left side (For CloudFuze, Inc.) if available
       if (quote.signatureData) {

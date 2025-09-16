@@ -132,14 +132,46 @@ export class DocxTemplateProcessor {
       if (placeholderMatches) {
         console.log('🔍 Found placeholders in clean text:', placeholderMatches);
         
+        // CRITICAL: Log the exact text around company name tokens to see what's on the third page
+        console.log('🔍 SEARCHING FOR COMPANY NAME TOKENS IN TEMPLATE:');
+        const companyTokenPatterns = [
+          /\{\{\s*Company\s+Name\s*\}\}/gi,
+          /\{\{\s*Company_Name\s*\}\}/gi,
+          /\{\{\s*company\s+name\s*\}\}/gi,
+          /\{\{\s*company_name\s*\}\}/gi
+        ];
+        
+        companyTokenPatterns.forEach((pattern, index) => {
+          const matches = cleanText.match(pattern);
+          if (matches) {
+            console.log(`  ✅ Found company token pattern ${index + 1}:`, matches);
+            // Find the context around each match
+            matches.forEach(match => {
+              const matchIndex = cleanText.indexOf(match);
+              const context = cleanText.substring(
+                Math.max(0, matchIndex - 100),
+                Math.min(cleanText.length, matchIndex + match.length + 100)
+              );
+              console.log(`    Context: "${context}"`);
+            });
+          } else {
+            console.log(`  ❌ No matches for company token pattern ${index + 1}`);
+          }
+        });
+        
         // CRITICAL: Check for the specific tokens we expect
         const expectedTokens = [
-          '{{Company_Name}}',
+          '{{Company Name}}',  // Space version (from template)
+          '{{ Company Name }}',  // Space version with extra spaces (from third page)
+          '{{Company_Name}}',  // Underscore version (fallback)
+          '{{ Company_Name }}',  // Underscore version with extra spaces (from third page)
           '{{users_count}}', 
           '{{users_cost}}',
-          '{{Duration_of_months}}',
+          '{{Duration of months}}',  // Space version (from template)
+          '{{Duration_of_months}}',  // Underscore version (fallback)
           '{{price_migration}}',
-          '{{total_price}}'
+          '{{total price}}',  // Space version (from template)
+          '{{total_price}}'   // Underscore version (fallback)
         ];
         
         console.log('🔍 TOKEN VALIDATION:');
@@ -218,6 +250,22 @@ export class DocxTemplateProcessor {
           // Remove {{}} brackets for docxtemplater
           const cleanKey = key.slice(2, -2);
           docxtemplaterData[cleanKey] = processedData[key];
+          
+          // CRITICAL: Also add underscore version for compatibility
+          // This handles cases where template has "Company Name" but docxtemplater expects "Company_Name"
+          if (cleanKey.includes(' ')) {
+            const underscoreKey = cleanKey.replace(/\s+/g, '_');
+            docxtemplaterData[underscoreKey] = processedData[key];
+            console.log(`🔧 Added underscore version: "${cleanKey}" → "${underscoreKey}"`);
+          }
+          
+          // CRITICAL: Also add space version for compatibility
+          // This handles cases where template has "Company_Name" but docxtemplater expects "Company Name"
+          if (cleanKey.includes('_')) {
+            const spaceKey = cleanKey.replace(/_/g, ' ');
+            docxtemplaterData[spaceKey] = processedData[key];
+            console.log(`🔧 Added space version: "${cleanKey}" → "${spaceKey}"`);
+          }
         } else {
           // Keep non-bracket keys as is
           docxtemplaterData[key] = processedData[key];
@@ -225,7 +273,13 @@ export class DocxTemplateProcessor {
       });
       
       console.log('🔍 DOCXTEMPLATER DATA (without brackets):');
-      const cleanTokens = ['Company_Name', 'users_count', 'users_cost', 'Duration_of_months', 'price_migration', 'total_price'];
+      const cleanTokens = [
+        'Company Name', 'Company_Name',  // Both space and underscore versions
+        'users_count', 'users_cost', 
+        'Duration of months', 'Duration_of_months',  // Both space and underscore versions
+        'price_migration', 
+        'total price', 'total_price'  // Both space and underscore versions
+      ];
       cleanTokens.forEach(token => {
         const value = docxtemplaterData[token];
         console.log(`  ${token}: "${value}" (type: ${typeof value})`);
@@ -234,6 +288,37 @@ export class DocxTemplateProcessor {
       try {
         doc.render(docxtemplaterData);
         console.log('✅ Template rendered successfully with new API');
+        
+        // CRITICAL: Log the final processed document to verify tokens were replaced
+        const finalDocumentXml = zip.file('word/document.xml')?.asText() || '';
+        const finalCleanText = this.extractTextFromDocxXml(finalDocumentXml);
+        console.log('🔍 FINAL DOCUMENT TEXT (first 1000 chars):', finalCleanText.substring(0, 1000));
+        
+        // Check if "undefined" is still present
+        if (finalCleanText.includes('undefined')) {
+          console.error('❌ CRITICAL: "undefined" still found in final document!');
+          console.log('🔍 Text around "undefined":', finalCleanText.substring(
+            Math.max(0, finalCleanText.indexOf('undefined') - 100),
+            finalCleanText.indexOf('undefined') + 100
+          ));
+          
+          // CRITICAL: Check if company name tokens are still present
+          const remainingCompanyTokens = finalCleanText.match(/\{\{[^}]*[Cc]ompany[^}]*\}\}/g);
+          if (remainingCompanyTokens) {
+            console.error('❌ CRITICAL: Company name tokens still present in final document:', remainingCompanyTokens);
+            remainingCompanyTokens.forEach(token => {
+              const tokenIndex = finalCleanText.indexOf(token);
+              const context = finalCleanText.substring(
+                Math.max(0, tokenIndex - 100),
+                Math.min(finalCleanText.length, tokenIndex + token.length + 100)
+              );
+              console.log(`  Token: "${token}" - Context: "${context}"`);
+            });
+          }
+        } else {
+          console.log('✅ No "undefined" found in final document');
+        }
+        
       } catch (error) {
         console.error('❌ Template rendering error:', error);
         
@@ -386,6 +471,14 @@ export class DocxTemplateProcessor {
    */
   private prepareTemplateData(data: DocxTemplateData): any {
     console.log('🔍 DOCX PROCESSOR: prepareTemplateData called with:', data);
+    
+    // CRITICAL: Log the exact data structure being received
+    console.log('🔍 DOCX PROCESSOR: Raw data structure:');
+    console.log('  data keys:', Object.keys(data));
+    console.log('  data values:', Object.values(data));
+    console.log('  data.{{Company Name}}:', data['{{Company Name}}']);
+    console.log('  data.{{Company_Name}}:', data['{{Company_Name}}']);
+    console.log('  data.company:', data.company);
     
     // COMPREHENSIVE: Create a data object that covers ALL possible token variations
     const processedData: any = {};

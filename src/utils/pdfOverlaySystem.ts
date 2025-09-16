@@ -432,6 +432,7 @@ export class PDFOverlaySystem {
       const tokenMappings = {
         // Exact tokens from your template
         '{{Company Name}}': quoteData.company || quoteData.clientName || 'Demo Company Inc.',
+        '{{Company_Name}}': quoteData.company || quoteData.clientName || 'Demo Company Inc.', // Underscore version
         '{{users_count}}': quoteData.configuration?.numberOfUsers?.toString() || '1',
         '{{users_cost}}': this.formatCurrency(quoteData.calculation?.migrationCost || 0),
         '{{Duration of months}}': quoteData.configuration?.duration?.toString() || '1',
