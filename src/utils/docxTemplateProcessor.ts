@@ -29,6 +29,14 @@ export interface DocxTemplateData {
   '{{date}}'?: string;
   '{{Effective Date}}'?: string;
   
+  // Discount and instance cost tokens
+  '{{instance_cost}}'?: string;
+  '{{discount}}'?: string;
+  '{{discount_percent}}'?: string;
+  '{{discount_amount}}'?: string;
+  '{{total_after_discount}}'?: string;
+  '{{final_total}}'?: string;
+  
   // Legacy fields for backward compatibility
   company?: string;
   clientName?: string;
@@ -639,6 +647,13 @@ export class DocxTemplateProcessor {
       '{{planName}}': data.planName || 'Basic',
       '{{plan_name}}': data.planName || 'Basic',
       
+      // Discount tokens
+      '{{discount}}': (data as any)['{{discount}}'] || '0',
+      '{{discount_percent}}': (data as any)['{{discount_percent}}'] || '0',
+      '{{discount_amount}}': (data as any)['{{discount_amount}}'] || '$0.00',
+      '{{total_after_discount}}': (data as any)['{{total_after_discount}}'] || (data as any)['{{total_price}}'] || '$0.00',
+      '{{final_total}}': (data as any)['{{final_total}}'] || (data as any)['{{total_after_discount}}'] || (data as any)['{{total_price}}'] || '$0.00',
+      
       // Legacy support (for backward compatibility)
       company: companyName,
       clientName: clientName,
@@ -790,7 +805,11 @@ Plan: ${templateData.planName}
 PRICING BREAKDOWN
 Migration Cost: ${templateData.price_migration}
 Data Cost: ${templateData.price_data}
-Total Cost: ${templateData.total}
+Instance Cost: ${templateData['{{instance_cost}}'] || '$0.00'}
+Subtotal: ${templateData.total}
+Discount: ${templateData['{{discount}}'] || '0'}%
+Discount Amount: ${templateData['{{discount_amount}}'] || '$0.00'}
+Total After Discount: ${templateData['{{total_after_discount}}'] || templateData.total}
 
 TERMS AND CONDITIONS
 This agreement outlines the services to be provided by CloudFuze for the migration and management of the client's data and systems as specified above.

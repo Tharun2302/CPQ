@@ -101,16 +101,34 @@ function App() {
   }, []);
 
   // Helper function to convert base64 data URL back to File
-  const dataURLtoFile = (dataURL: string, fileName: string): File => {
-    const arr = dataURL.split(',');
-    const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
+  const dataURLtoFile = (dataURL: string, fileName: string): File | null => {
+    try {
+      if (!dataURL || !fileName) {
+        console.warn('⚠️ Invalid dataURL or fileName for file conversion');
+        return null;
+      }
+
+      const arr = dataURL.split(',');
+      if (arr.length !== 2) {
+        console.warn('⚠️ Invalid dataURL format');
+        return null;
+      }
+
+      const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+
+      const file = new File([u8arr], fileName, { type: mime });
+      console.log('✅ File converted successfully:', fileName, 'Size:', file.size, 'bytes');
+      return file;
+    } catch (error) {
+      console.error('❌ Error converting dataURL to File:', error);
+      return null;
     }
-    return new File([u8arr], fileName, { type: mime });
   };
 
   // Load templates from localStorage on app start
@@ -120,14 +138,26 @@ function App() {
       if (savedTemplates) {
         try {
           const parsedTemplates = JSON.parse(savedTemplates);
-          // Convert base64 strings back to File objects
-          const templatesWithFiles = parsedTemplates.map((template: any) => ({
-            ...template,
-            file: template.fileData ? dataURLtoFile(template.fileData, template.fileName) : null,
-            wordFile: template.wordFileData ? dataURLtoFile(template.wordFileData, template.wordFileName) : null,
-            uploadDate: new Date(template.uploadDate),
-            content: template.content || null
-          }));
+          // Convert base64 strings back to File objects with validation
+          const templatesWithFiles = parsedTemplates.map((template: any) => {
+            const file = template.fileData ? dataURLtoFile(template.fileData, template.fileName) : null;
+            const wordFile = template.wordFileData ? dataURLtoFile(template.wordFileData, template.wordFileName) : null;
+            
+            // Validate template has required data
+            if (!template.id || !template.name) {
+              console.warn('⚠️ Invalid template data:', template);
+              return null;
+            }
+            
+            return {
+              ...template,
+              file,
+              wordFile,
+              uploadDate: template.uploadDate ? new Date(template.uploadDate) : new Date(),
+              content: template.content || null
+            };
+          }).filter(template => template !== null); // Remove invalid templates
+          
           setTemplates(templatesWithFiles);
           console.log('✅ Loaded templates from localStorage:', templatesWithFiles.length, 'templates');
         } catch (error) {
@@ -181,10 +211,27 @@ function App() {
   // Helper function to convert File to data URL
   const fileToDataURL = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+      try {
+        if (!file || file.size === 0) {
+          reject(new Error('Invalid file provided'));
+          return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          console.log('✅ File converted to dataURL:', file.name, 'Size:', file.size, 'bytes');
+          resolve(result);
+        };
+        reader.onerror = (error) => {
+          console.error('❌ Error reading file:', error);
+          reject(error);
+        };
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('❌ Error in fileToDataURL:', error);
+        reject(error);
+      }
     });
   };
 
@@ -202,18 +249,52 @@ function App() {
         
         // Convert File objects to data URLs for storage
         const saveTemplate = async () => {
-          const templateForStorage = {
-            ...selectedTemplate,
-            fileData: selectedTemplate.file ? await fileToDataURL(selectedTemplate.file) : null,
-            fileName: selectedTemplate.file ? selectedTemplate.file.name : null,
-            wordFileData: selectedTemplate.wordFile ? await fileToDataURL(selectedTemplate.wordFile) : null,
-            wordFileName: selectedTemplate.wordFile ? selectedTemplate.wordFile.name : null,
-            file: undefined, // Remove file object as it can't be serialized
-            wordFile: undefined
-          };
-          
-          localStorage.setItem('cpq_selected_template', JSON.stringify(templateForStorage));
-          console.log('✅ Saved selected template to localStorage:', selectedTemplate.name);
+          try {
+            const templateForStorage = {
+              ...selectedTemplate,
+              fileData: selectedTemplate.file ? await fileToDataURL(selectedTemplate.file) : null,
+              fileName: selectedTemplate.file ? selectedTemplate.file.name : null,
+              wordFileData: selectedTemplate.wordFile ? await fileToDataURL(selectedTemplate.wordFile) : null,
+              wordFileName: selectedTemplate.wordFile ? selectedTemplate.wordFile.name : null,
+              file: undefined, // Remove file object as it can't be serialized
+              wordFile: undefined
+            };
+            
+            // Check localStorage size before saving
+            const templateString = JSON.stringify(templateForStorage);
+            const sizeInBytes = new Blob([templateString]).size;
+            const maxSize = 2 * 1024 * 1024; // 2MB limit for selected template
+            
+            if (sizeInBytes > maxSize) {
+              console.warn('⚠️ Selected template too large for localStorage, saving without file data');
+              const templateWithoutFiles = {
+                ...templateForStorage,
+                fileData: null,
+                wordFileData: null
+              };
+              localStorage.setItem('cpq_selected_template', JSON.stringify(templateWithoutFiles));
+            } else {
+              localStorage.setItem('cpq_selected_template', templateString);
+            }
+            
+            console.log('✅ Saved selected template to localStorage:', selectedTemplate.name);
+          } catch (error) {
+            console.error('❌ Error saving selected template:', error);
+            // Try to save without file data as fallback
+            try {
+              const templateWithoutFiles = {
+                ...selectedTemplate,
+                fileData: null,
+                wordFileData: null,
+                file: undefined,
+                wordFile: undefined
+              };
+              localStorage.setItem('cpq_selected_template', JSON.stringify(templateWithoutFiles));
+              console.log('✅ Saved selected template without file data as fallback');
+            } catch (fallbackError) {
+              console.error('❌ Failed to save selected template even without file data:', fallbackError);
+            }
+          }
         };
         
         saveTemplate();

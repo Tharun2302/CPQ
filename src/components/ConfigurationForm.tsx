@@ -49,12 +49,12 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
   onTemplateSelect
 }) => {
   const [config, setConfig] = useState<ConfigurationData>({
-    numberOfUsers: 1,
+    numberOfUsers: 0,
     instanceType: 'Small',
-    numberOfInstances: 1,
-    duration: 1,
+    numberOfInstances: 0,
+    duration: 0,
     migrationType: '' as any, // Start with empty to hide other fields
-    dataSizeGB: 100
+    dataSizeGB: 0
   });
 
   // Contact information state
@@ -98,6 +98,7 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
 
 
   const handleChange = (field: keyof ConfigurationData, value: any) => {
+    console.log(`🔧 ConfigurationForm: Changing ${field} from ${config[field]} to ${value}`);
     const newConfig = { ...config, [field]: value };
     setConfig(newConfig);
     onConfigurationChange(newConfig);
@@ -138,6 +139,25 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate that all required fields have valid values (minimum 1)
+    if (config.numberOfUsers < 1) {
+      alert('Please enter a valid number of users (minimum 1)');
+      return;
+    }
+    if (config.numberOfInstances < 1) {
+      alert('Please enter a valid number of instances (minimum 1)');
+      return;
+    }
+    if (config.duration < 1) {
+      alert('Please enter a valid project duration (minimum 1 month)');
+      return;
+    }
+    if (config.migrationType !== 'Messaging' && config.dataSizeGB < 1) {
+      alert('Please enter a valid data size (minimum 1 GB)');
+      return;
+    }
+    
     onSubmit();
     
     // Auto-scroll down after calculating pricing to show results
@@ -350,10 +370,16 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
               <input
                 type="number"
                 min="1"
-                value={config.numberOfUsers}
-                onChange={(e) => handleChange('numberOfUsers', parseInt(e.target.value) || 1)}
+                step="1"
+                value={config.numberOfUsers || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const numValue = value === '' ? 0 : parseInt(value) || 0;
+                  handleChange('numberOfUsers', numValue);
+                }}
                 className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 bg-white/80 backdrop-blur-sm hover:border-blue-300 text-lg font-medium"
                 placeholder="Enter number of users"
+                autoComplete="off"
               />
             </div>
 
@@ -388,10 +414,16 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
               <input
                 type="number"
                 min="1"
-                value={config.numberOfInstances}
-                onChange={(e) => handleChange('numberOfInstances', parseInt(e.target.value) || 1)}
+                step="1"
+                value={config.numberOfInstances || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const numValue = value === '' ? 0 : parseInt(value) || 0;
+                  handleChange('numberOfInstances', numValue);
+                }}
                 className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 bg-white/80 backdrop-blur-sm hover:border-blue-300 text-lg font-medium"
                 placeholder="Enter number of instances"
+                autoComplete="off"
               />
             </div>
 
@@ -406,10 +438,16 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
               <input
                 type="number"
                 min="1"
-                value={config.duration}
-                onChange={(e) => handleChange('duration', parseInt(e.target.value) || 1)}
+                step="1"
+                value={config.duration || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const numValue = value === '' ? 0 : parseInt(value) || 0;
+                  handleChange('duration', numValue);
+                }}
                 className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 bg-white/80 backdrop-blur-sm hover:border-blue-300 text-lg font-medium"
                 placeholder="Enter project duration"
+                autoComplete="off"
               />
             </div>
 
@@ -425,10 +463,16 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
                     <input
                       type="number"
                       min="1"
-                      value={config.dataSizeGB}
-                      onChange={(e) => handleChange('dataSizeGB', parseInt(e.target.value) || 1)}
+                      step="1"
+                      value={config.dataSizeGB || ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        const numValue = value === '' ? 0 : parseInt(value) || 0;
+                        handleChange('dataSizeGB', numValue);
+                      }}
                       className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 bg-white/80 backdrop-blur-sm hover:border-blue-300 text-lg font-medium"
                       placeholder={`Enter data size in GB for ${config.migrationType} migration`}
+                      autoComplete="off"
                     />
                   </div>
                 )}

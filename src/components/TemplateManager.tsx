@@ -153,14 +153,25 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
               const parsedTemplates = JSON.parse(savedTemplates);
               console.log('📋 TemplateManager: Found saved templates in localStorage:', parsedTemplates.length);
               
-              // Convert base64 strings back to File objects
-              const templatesWithFiles = parsedTemplates.map((template: any) => ({
-                ...template,
-                file: template.fileData ? dataURLtoFile(template.fileData, template.fileName) : null,
-                wordFile: template.wordFileData ? dataURLtoFile(template.wordFileData, template.wordFileName) : null,
-                uploadDate: new Date(template.uploadDate),
-                content: template.content || null
-              }));
+              // Convert base64 strings back to File objects with validation
+              const templatesWithFiles = parsedTemplates.map((template: any) => {
+                // Validate template has required data
+                if (!template.id || !template.name) {
+                  console.warn('⚠️ Invalid template data found:', template);
+                  return null;
+                }
+                
+                const file = template.fileData ? dataURLtoFile(template.fileData, template.fileName) : null;
+                const wordFile = template.wordFileData ? dataURLtoFile(template.wordFileData, template.wordFileName) : null;
+                
+                return {
+                  ...template,
+                  file,
+                  wordFile,
+                  uploadDate: template.uploadDate ? new Date(template.uploadDate) : new Date(),
+                  content: template.content || null
+                };
+              }).filter((template: any) => template !== null); // Remove invalid templates
               
               console.log('✅ TemplateManager: Templates loaded from localStorage:', templatesWithFiles.length);
               setTemplates(templatesWithFiles);
@@ -219,18 +230,46 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
               file: undefined
             }));
             
-            localStorage.setItem('cpq_templates', JSON.stringify(templatesForStorage));
-            console.log('✅ Templates saved without file data to save space');
+            try {
+              localStorage.setItem('cpq_templates', JSON.stringify(templatesForStorage));
+              console.log('✅ Templates saved without file data to save space');
+            } catch (storageError) {
+              console.error('❌ Failed to save templates even without file data:', storageError);
+              // Try to save just the essential data
+              const essentialTemplates = templates.map(template => ({
+                id: template.id,
+                name: template.name,
+                isDefault: template.isDefault,
+                uploadDate: template.uploadDate,
+                fileName: template.file ? template.file.name : null
+              }));
+              localStorage.setItem('cpq_templates', JSON.stringify(essentialTemplates));
+              console.log('✅ Saved essential template data only');
+            }
           } else {
-          // Convert File objects to base64 strings for storage
-          const templatesForStorage = await Promise.all(templates.map(async (template) => ({
-            ...template,
-            fileData: template.file ? await fileToDataURL(template.file) : null,
-            fileName: template.file ? template.file.name : null,
-            file: undefined // Remove file object as it can't be serialized
-          })));
-          
-          localStorage.setItem('cpq_templates', JSON.stringify(templatesForStorage));
+            try {
+              // Convert File objects to base64 strings for storage
+              const templatesForStorage = await Promise.all(templates.map(async (template) => ({
+                ...template,
+                fileData: template.file ? await fileToDataURL(template.file) : null,
+                fileName: template.file ? template.file.name : null,
+                file: undefined // Remove file object as it can't be serialized
+              })));
+              
+              localStorage.setItem('cpq_templates', JSON.stringify(templatesForStorage));
+              console.log('✅ Templates saved with file data');
+            } catch (conversionError) {
+              console.error('❌ Error converting files to base64:', conversionError);
+              // Fallback: save without file data
+              const templatesForStorage = templates.map(template => ({
+                ...template,
+                fileData: null,
+                fileName: template.file ? template.file.name : null,
+                file: undefined
+              }));
+              localStorage.setItem('cpq_templates', JSON.stringify(templatesForStorage));
+              console.log('✅ Templates saved without file data as fallback');
+            }
           }
         } else {
           // Clear templates from localStorage if array is empty
@@ -259,14 +298,27 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
   // Helper function to convert File to base64 data URL
   const fileToDataURL = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        resolve(reader.result as string);
-      };
-      reader.onerror = () => {
-        reject(new Error('Failed to read file'));
-      };
-      reader.readAsDataURL(file);
+      try {
+        if (!file || file.size === 0) {
+          reject(new Error('Invalid file provided'));
+          return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          console.log('✅ File converted to dataURL:', file.name, 'Size:', file.size, 'bytes');
+          resolve(result);
+        };
+        reader.onerror = (error) => {
+          console.error('❌ Error reading file:', error);
+          reject(error);
+        };
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('❌ Error in fileToDataURL:', error);
+        reject(error);
+      }
     });
   };
 
@@ -291,16 +343,34 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
   };
 
   // Helper function to convert base64 data URL back to File
-  const dataURLtoFile = (dataURL: string, fileName: string): File => {
-    const arr = dataURL.split(',');
-    const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/pdf';
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
+  const dataURLtoFile = (dataURL: string, fileName: string): File | null => {
+    try {
+      if (!dataURL || !fileName) {
+        console.warn('⚠️ Invalid dataURL or fileName for file conversion');
+        return null;
+      }
+
+      const arr = dataURL.split(',');
+      if (arr.length !== 2) {
+        console.warn('⚠️ Invalid dataURL format');
+        return null;
+      }
+
+      const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/pdf';
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+
+      const file = new File([u8arr], fileName, { type: mime });
+      console.log('✅ File converted successfully:', fileName, 'Size:', file.size, 'bytes');
+      return file;
+    } catch (error) {
+      console.error('❌ Error converting dataURL to File:', error);
+      return null;
     }
-    return new File([u8arr], fileName, { type: mime });
   };
 
   const formatFileSize = (bytes: number): string => {
