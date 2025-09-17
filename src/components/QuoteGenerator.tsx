@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PricingCalculation, ConfigurationData, Quote } from '../types/pricing';
 import { formatCurrency } from '../utils/pricing';
 import { 
@@ -11,7 +11,10 @@ import {
   CheckCircle, 
   Users, 
   Sparkles,
-  Eye
+  Eye,
+  Percent,
+  Info,
+  Briefcase
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -60,6 +63,7 @@ interface ClientInfo {
   clientName: string;
   clientEmail: string;
   company: string;
+  discount?: number;
 }
 
 const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
@@ -108,12 +112,37 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
   const [clientInfo, setClientInfo] = useState<ClientInfo>({
     clientName: '',
     clientEmail: '',
-    company: ''
+    company: '',
+    discount: undefined
   });
 
   const [showPreview, setShowPreview] = useState(false);
   const [showContactSelector, setShowContactSelector] = useState(false);
   const [quoteId, setQuoteId] = useState<string>('');
+  const [isSendingToDealDesk, setIsSendingToDealDesk] = useState(false);
+  
+  // Allow discount only when total project cost exceeds $2500
+  const isDiscountAllowed = (calculation?.totalCost ?? safeCalculation.totalCost) > 2500;
+  
+  // Calculate final total after discount
+  const discountPercent = clientInfo.discount ?? 0;
+  const finalTotalAfterDiscount = (calculation?.totalCost ?? safeCalculation.totalCost) * (1 - (discountPercent / 100));
+  
+  // Check if discount would bring total below $2500
+  const isDiscountValid = finalTotalAfterDiscount >= 2500;
+  
+  // Maximum allowed discount percentage to keep total above $2500, but capped at 10%
+  const maxDiscountForMinimum = isDiscountAllowed ? 
+    Math.max(0, Math.floor(((calculation?.totalCost ?? safeCalculation.totalCost) - 2500) / (calculation?.totalCost ?? safeCalculation.totalCost) * 100)) : 0;
+  
+  const maxAllowedDiscount = Math.min(maxDiscountForMinimum, 10); // Cap at 10%
+
+  // Reset discount when it is not allowed or would bring total below $2500
+  useEffect(() => {
+    if ((!isDiscountAllowed || !isDiscountValid) && clientInfo.discount && clientInfo.discount > 0) {
+      setClientInfo({ ...clientInfo, discount: undefined });
+    }
+  }, [isDiscountAllowed, isDiscountValid]);
 
   // Generate unique quote ID
   const generateUniqueQuoteId = (): string => {
@@ -128,7 +157,7 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
     setClientInfo(newClientInfo);
     
     // Only notify parent when user makes actual changes (not during auto-fill)
-    if (onClientInfoChange && (updates.clientName || updates.clientEmail || updates.company)) {
+    if (onClientInfoChange && (updates.clientName || updates.clientEmail || updates.company || updates.discount !== undefined)) {
       onClientInfoChange(newClientInfo);
     }
   };
@@ -152,6 +181,55 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
   const [isGeneratingAgreement, setIsGeneratingAgreement] = useState(false);
   const [showInlinePreview, setShowInlinePreview] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const ensureDocxPreviewStylesInjected = () => {
+    const existing = document.getElementById('docx-preview-css');
+    if (existing) return;
+    const link = document.createElement('link');
+    link.id = 'docx-preview-css';
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/docx-preview@0.4.1/dist/docx-preview.css';
+    document.head.appendChild(link);
+  };
+
+  const delayFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+  const renderDocxPreview = async (blob: Blob) => {
+    try {
+      ensureDocxPreviewStylesInjected();
+      // @ts-ignore - resolved at runtime; types provided via ambient declaration
+      const { renderAsync } = await import('docx-preview');
+      const arrayBuffer = await blob.arrayBuffer();
+      // Ensure container exists in DOM
+      setShowInlinePreview(true);
+      await delayFrame();
+      if (previewContainerRef.current) previewContainerRef.current.innerHTML = '';
+      await renderAsync(arrayBuffer, previewContainerRef.current as HTMLElement, undefined, {
+        inWrapper: true,
+        ignoreWidth: false,
+        ignoreHeight: false,
+        className: 'docx',
+        debug: false
+      } as any);
+      setPreviewUrl(null);
+      console.log('✅ DOCX rendered with docx-preview');
+    } catch (err) {
+      console.warn('⚠️ docx-preview failed, falling back to HTML conversion via mammoth.', err);
+      try {
+        const mammoth = await import('mammoth');
+        const arrayBuffer = await blob.arrayBuffer();
+        const result = await mammoth.convertToHtml({ arrayBuffer } as any);
+        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Document Preview</title></head><body>${result.value}</body></html>`;
+        const htmlBlob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(htmlBlob);
+        setPreviewUrl(url);
+        setShowInlinePreview(true);
+      } catch (fallbackErr) {
+        console.error('❌ HTML fallback also failed:', fallbackErr);
+      }
+    }
+  };
 
   // Auto-populate client info from configure session (HIGHEST PRIORITY)
   useEffect(() => {
@@ -252,10 +330,126 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
     );
   }
 
+  const handleSendToDealDesk = async () => {
+    // Validate discount is not more than 10%
+    if (clientInfo.discount && clientInfo.discount > 10) {
+      alert('Discount cannot be more than 10%. Please adjust the discount value.');
+      return;
+    }
+    
+    // Validate discount doesn't bring total below $2500
+    if (clientInfo.discount && clientInfo.discount > 0) {
+      const finalTotal = (calculation?.totalCost ?? safeCalculation.totalCost) * (1 - (clientInfo.discount / 100));
+      if (finalTotal < 2500) {
+        alert(`Discount cannot be applied. Final total would be $${finalTotal.toFixed(2)}, which is below the minimum of $2,500.`);
+        return;
+      }
+    }
+    
+    setIsSendingToDealDesk(true);
+    
+    try {
+      // Create quote data for deal desk
+      const quoteData: Quote = {
+        id: `quote-${Date.now()}`,
+        clientName: clientInfo.clientName,
+        clientEmail: clientInfo.clientEmail,
+        company: clientInfo.company,
+        configuration: configuration,
+        selectedTier: safeCalculation.tier,
+        calculation: safeCalculation,
+        status: 'draft' as const,
+        createdAt: new Date(),
+        templateUsed: selectedTemplate ? {
+          id: selectedTemplate.id,
+          name: selectedTemplate.name,
+          isDefault: false
+        } : { id: 'default', name: 'Default Template', isDefault: true },
+        dealData: dealData
+      };
+      
+      console.log('📤 Sending quote to Deal Desk:', quoteData);
+      // Prepare email content
+      const emailSubject = `New Quote Request - ${clientInfo.company} - ${clientInfo.clientName}`;
+      const emailBody = `
+New Quote Request for Deal Desk Review
+
+CLIENT INFORMATION:
+- Client Name: ${clientInfo.clientName}
+- Email: ${clientInfo.clientEmail}
+- Company: ${clientInfo.company}
+- Discount Applied: ${clientInfo.discount ?? 0}%
+
+PROJECT CONFIGURATION:
+- Number of Users: ${configuration?.numberOfUsers || 'N/A'}
+- Instance Type: ${configuration?.instanceType || 'N/A'}
+- Number of Instances: ${configuration?.numberOfInstances || 'N/A'}
+- Duration: ${configuration?.duration || 'N/A'} months
+- Migration Type: ${configuration?.migrationType || 'N/A'}
+- Data Size: ${configuration?.dataSizeGB || 'N/A'} GB
+
+PRICING BREAKDOWN (${safeCalculation.tier.name} Plan):
+- User Costs: ${formatCurrency(safeCalculation.userCost)}
+- Data Costs: ${formatCurrency(safeCalculation.dataCost)}
+- Migration Services: ${formatCurrency(safeCalculation.migrationCost)}
+- Instance Costs: ${formatCurrency(safeCalculation.instanceCost)}
+- Subtotal: ${formatCurrency(safeCalculation.totalCost)}
+${(clientInfo.discount ?? 0) > 0 ? `- Discount (${clientInfo.discount}%): -${formatCurrency(safeCalculation.totalCost * ((clientInfo.discount ?? 0) / 100))}` : ''}
+- Final Total: ${formatCurrency(finalTotalAfterDiscount)}
+
+DEAL INFORMATION:
+- Deal ID: ${dealData?.dealId || 'N/A'}
+- Deal Name: ${dealData?.dealName || 'N/A'}
+- Deal Amount: ${dealData?.amount || 'N/A'}
+- Deal Stage: ${dealData?.stage || 'N/A'}
+
+TEMPLATE USED:
+- Template: ${selectedTemplate?.name || 'Default Template'}
+- Template ID: ${selectedTemplate?.id || 'default'}
+
+Please review this quote and approve or provide feedback.
+
+Generated on: ${new Date().toLocaleString()}
+Quote ID: ${quoteData.id}
+      `.trim();
+
+      // Create mailto link
+      const dealDeskEmail = 'dealdesk@cloudfuze.com'; // Replace with actual deal desk email
+      const mailtoLink = `mailto:${dealDeskEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+      
+      // Open email client
+      window.open(mailtoLink, '_blank');
+      
+      // Show success message
+      alert('Email client opened with quote details. Please send the email to complete the Deal Desk submission.');
+      
+    } catch (error) {
+      console.error('Error sending to Deal Desk:', error);
+      alert('Error preparing email. Please try again or contact support.');
+    } finally {
+      setIsSendingToDealDesk(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     console.log('🔍 handleSubmit - dealData:', dealData);
+    
+    // Validate discount is not more than 10%
+    if (clientInfo.discount && clientInfo.discount > 10) {
+      alert('Discount cannot be more than 10%. Please adjust the discount value.');
+      return;
+    }
+    
+    // Validate discount doesn't bring total below $2500
+    if (clientInfo.discount && clientInfo.discount > 0) {
+      const finalTotal = (calculation?.totalCost ?? safeCalculation.totalCost) * (1 - (clientInfo.discount / 100));
+      if (finalTotal < 2500) {
+        alert(`Discount cannot be applied. Final total would be $${finalTotal.toFixed(2)}, which is below the minimum of $2,500.`);
+        return;
+      }
+    }
     
     if (onGenerateQuote) {
       // Create quote object with deal information
@@ -340,7 +534,13 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
         year: '2-digit', 
         month: '2-digit', 
         day: '2-digit' 
-      })
+      }),
+        '{{instance_cost}}': formatCurrency(safeCalculation.instanceCost),
+        '{{discount}}': (isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? clientInfo.discount : 0).toString(),
+        '{{discount_percent}}': (isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? clientInfo.discount : 0).toString(),
+        '{{discount_amount}}': formatCurrency(isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? (safeCalculation.totalCost * (clientInfo.discount / 100)) : 0),
+        '{{total_after_discount}}': formatCurrency(isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? finalTotalAfterDiscount : safeCalculation.totalCost),
+        '{{final_total}}': formatCurrency(isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? finalTotalAfterDiscount : safeCalculation.totalCost)
     };
 
     // Create sample template text with placeholders - matches CloudFuze template
@@ -413,68 +613,236 @@ Total Price: {{total price}}`;
   const handleViewInline = async () => {
     if (processedAgreement) {
       try {
+        // Prefer exact docx renderer
+        if (processedAgreement.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+          // Ensure modal content is visible
+          setShowAgreementPreview(true);
+          await delayFrame();
+          await renderDocxPreview(processedAgreement);
+          return;
+        }
         console.log('✅ Converting DOCX to HTML for preview');
         console.log('📄 Document type:', processedAgreement.type);
         console.log('📄 Document size:', processedAgreement.size, 'bytes');
         
-        // Convert DOCX to HTML using mammoth for proper preview
+        // Convert DOCX to HTML using mammoth with exact formatting preservation
         const mammoth = await import('mammoth');
         
         const arrayBuffer = await processedAgreement.arrayBuffer();
-        const result = await mammoth.convertToHtml({ arrayBuffer });
+        const result = await mammoth.convertToHtml({ 
+          arrayBuffer,
+          styleMap: [
+            // Preserve table formatting
+            "p[style-name='Table Heading'] => h3.table-heading",
+            "p[style-name='Table Text'] => p.table-text",
+            "r[style-name='Strong'] => strong",
+            "r[style-name='Emphasis'] => em",
+            // Preserve colors and formatting
+            "r[style-name='Highlight'] => span.highlight",
+            "r[style-name='Heading 1'] => h1.heading-1",
+            "r[style-name='Heading 2'] => h2.heading-2",
+            "r[style-name='Heading 3'] => h3.heading-3",
+            // Preserve table styles
+            "table => table.docx-table",
+            "tr => tr.docx-row",
+            "td => td.docx-cell",
+            "th => th.docx-header",
+            // Preserve headers and footers
+            "p[style-name='Header'] => div.docx-header",
+            "p[style-name='Footer'] => div.docx-footer",
+            // Preserve page breaks
+            "br[type='page'] => div.page-break"
+          ],
+          convertImage: mammoth.images.imgElement(function(image) {
+            return image.read("base64").then(function(imageBuffer) {
+              return {
+                src: "data:" + image.contentType + ";base64," + imageBuffer
+              };
+            });
+          })
+        } as any);
         
-        console.log('✅ DOCX converted to HTML successfully');
+        console.log('✅ DOCX converted to HTML with exact formatting');
         console.log('📄 HTML length:', result.value.length);
+        console.log('📄 Warnings:', result.messages);
         
-        // Create HTML document with proper styling
+        // Create HTML document with exact DOCX styling preserved
         const htmlContent = `
           <!DOCTYPE html>
           <html>
           <head>
-            <title>Document Preview</title>
+            <title>Document Preview - Exact DOCX Formatting</title>
+            <meta charset="UTF-8">
             <style>
+              /* Reset and base styles */
+              * {
+                box-sizing: border-box;
+              }
+              
               body { 
                 font-family: 'Times New Roman', serif; 
-                margin: 40px; 
+                margin: 0;
+                padding: 40px;
                 line-height: 1.6;
                 color: #000;
                 background: white;
-                max-width: 800px;
-                margin: 40px auto;
-                padding: 20px;
+                font-size: 12pt;
               }
-              h1, h2, h3, h4, h5, h6 {
-                color: #333;
-                margin-top: 20px;
-                margin-bottom: 10px;
-              }
-              p {
-                margin-bottom: 10px;
-                text-align: justify;
-              }
-              table {
+              
+              /* Preserve exact DOCX formatting */
+              .docx-table {
                 border-collapse: collapse;
                 width: 100%;
                 margin: 20px 0;
+                border: 1px solid #000;
               }
-              table, th, td {
-                border: 1px solid #333;
+              
+              .docx-row {
+                border: 1px solid #000;
               }
-              th, td {
-                padding: 8px;
+              
+              .docx-cell, .docx-header {
+                border: 1px solid #000;
+                padding: 8px 12px;
+                vertical-align: top;
                 text-align: left;
               }
-              th {
+              
+              .docx-header {
                 background-color: #f2f2f2;
                 font-weight: bold;
+                text-align: center;
               }
+              
+              /* Preserve heading styles */
+              h1, h2, h3, h4, h5, h6 {
+                color: #000;
+                margin-top: 20px;
+                margin-bottom: 10px;
+                font-weight: bold;
+              }
+              
+              h1 { font-size: 18pt; }
+              h2 { font-size: 16pt; }
+              h3 { font-size: 14pt; }
+              h4 { font-size: 12pt; }
+              
+              /* Preserve paragraph formatting */
+              p {
+                margin-bottom: 10px;
+                text-align: left;
+                font-size: 12pt;
+                line-height: 1.15;
+              }
+              
+              /* Preserve text formatting */
+              strong, b {
+                font-weight: bold;
+              }
+              
+              em, i {
+                font-style: italic;
+              }
+              
               .highlight {
-                background-color: #ffffcc;
+                background-color: #ffff00;
+                padding: 1px 2px;
+              }
+              
+              /* Preserve list formatting */
+              ul, ol {
+                margin: 10px 0;
+                padding-left: 30px;
+              }
+              
+              li {
+                margin-bottom: 5px;
+              }
+              
+              /* Preserve table alignment */
+              .docx-table td[align="center"] {
+                text-align: center;
+              }
+              
+              .docx-table td[align="right"] {
+                text-align: right;
+              }
+              
+              .docx-table td[align="left"] {
+                text-align: left;
+              }
+              
+              /* Preserve colors and backgrounds */
+              .docx-table tr:nth-child(even) {
+                background-color: #f9f9f9;
+              }
+              
+              /* Preserve spacing */
+              .docx-table td {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              }
+              
+              /* Preserve page layout */
+              @media print {
+                body {
+                  margin: 0;
+                  padding: 20px;
+                }
+              }
+              
+              /* Preserve headers and footers */
+              .docx-header {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                background: white;
+                border-bottom: 1px solid #ccc;
+                padding: 10px;
+                font-size: 10pt;
+                z-index: 1000;
+              }
+              
+              .docx-footer {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: white;
+                border-top: 1px solid #ccc;
+                padding: 10px;
+                font-size: 10pt;
+                z-index: 1000;
+              }
+              
+              /* Preserve page breaks */
+              .page-break {
+                page-break-before: always;
+                break-before: page;
+                margin: 20px 0;
+                border-top: 1px dashed #ccc;
+                padding-top: 20px;
+              }
+              
+              /* Adjust body padding for headers/footers */
+              body {
+                padding-top: 60px;
+                padding-bottom: 60px;
+              }
+              
+              /* Ensure exact DOCX appearance */
+              .docx-content {
+                max-width: 100%;
+                margin: 0 auto;
               }
             </style>
           </head>
           <body>
-            ${result.value}
+            <div class="docx-content">
+              ${result.value}
+            </div>
           </body>
           </html>
         `;
@@ -1050,7 +1418,13 @@ Total Price: {{total price}}`;
             year: '2-digit', 
             month: '2-digit', 
             day: '2-digit' 
-          })
+          }),
+        '{{instance_cost}}': formatCurrency(quoteData.calculation?.instanceCost || 0),
+        '{{discount}}': (isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? clientInfo.discount : 0).toString(),
+        '{{discount_percent}}': (isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? clientInfo.discount : 0).toString(),
+        '{{discount_amount}}': formatCurrency(isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? (totalCost * (clientInfo.discount / 100)) : 0),
+        '{{total_after_discount}}': formatCurrency(isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? finalTotalAfterDiscount : totalCost),
+        '{{final_total}}': formatCurrency(isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? finalTotalAfterDiscount : totalCost)
         };
         
         console.log('🔍 TEMPLATE DATA CREATED:');
@@ -1327,67 +1701,236 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
         // Store the processed document for preview and download
         setProcessedAgreement(processedDocument);
         
-        // Convert DOCX to HTML for preview if it's a DOCX file
+        // For DOCX files render with docx-preview to match exact document formatting
         if (processedDocument.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+          // Open modal first so container exists, then render
+          setShowAgreementPreview(true);
+          await delayFrame();
           try {
-            console.log('🔄 Converting DOCX to HTML for preview...');
+            await renderDocxPreview(processedDocument);
+            return;
+          } catch (err) {
+            console.warn('docx-preview render failed in initial flow, trying mammoth HTML fallback.', err);
+          }
+          try {
+            console.log('🔄 Converting DOCX to HTML for preview with exact formatting...');
             const mammoth = await import('mammoth');
             
             const arrayBuffer = await processedDocument.arrayBuffer();
-            const result = await mammoth.convertToHtml({ arrayBuffer });
+            const result = await mammoth.convertToHtml({ 
+              arrayBuffer,
+              styleMap: [
+                // Preserve table formatting
+                "p[style-name='Table Heading'] => h3.table-heading",
+                "p[style-name='Table Text'] => p.table-text",
+                "r[style-name='Strong'] => strong",
+                "r[style-name='Emphasis'] => em",
+                // Preserve colors and formatting
+                "r[style-name='Highlight'] => span.highlight",
+                "r[style-name='Heading 1'] => h1.heading-1",
+                "r[style-name='Heading 2'] => h2.heading-2",
+                "r[style-name='Heading 3'] => h3.heading-3",
+                // Preserve table styles
+                "table => table.docx-table",
+                "tr => tr.docx-row",
+                "td => td.docx-cell",
+                "th => th.docx-header",
+                // Preserve headers and footers
+                "p[style-name='Header'] => div.docx-header",
+                "p[style-name='Footer'] => div.docx-footer",
+                // Preserve page breaks
+                "br[type='page'] => div.page-break"
+              ],
+              convertImage: mammoth.images.imgElement(function(image) {
+                return image.read("base64").then(function(imageBuffer) {
+                  return {
+                    src: "data:" + image.contentType + ";base64," + imageBuffer
+                  };
+                });
+              })
+            } as any);
             
-            console.log('✅ DOCX converted to HTML successfully');
+            console.log('✅ DOCX converted to HTML with exact formatting');
             console.log('📄 HTML length:', result.value.length);
+            console.log('📄 Warnings:', result.messages);
             
-            // Create HTML document with proper styling
+            // Create HTML document with exact DOCX styling preserved
             const htmlContent = `
               <!DOCTYPE html>
               <html>
               <head>
-                <title>Document Preview</title>
+                <title>Document Preview - Exact DOCX Formatting</title>
+                <meta charset="UTF-8">
                 <style>
+                  /* Reset and base styles */
+                  * {
+                    box-sizing: border-box;
+                  }
+                  
                   body { 
                     font-family: 'Times New Roman', serif; 
-                    margin: 40px; 
+                    margin: 0;
+                    padding: 40px;
                     line-height: 1.6;
                     color: #000;
                     background: white;
-                    max-width: 800px;
-                    margin: 40px auto;
-                    padding: 20px;
+                    font-size: 12pt;
                   }
-                  h1, h2, h3, h4, h5, h6 {
-                    color: #333;
-                    margin-top: 20px;
-                    margin-bottom: 10px;
-                  }
-                  p {
-                    margin-bottom: 10px;
-                    text-align: justify;
-                  }
-                  table {
+                  
+                  /* Preserve exact DOCX formatting */
+                  .docx-table {
                     border-collapse: collapse;
                     width: 100%;
                     margin: 20px 0;
+                    border: 1px solid #000;
                   }
-                  table, th, td {
-                    border: 1px solid #333;
+                  
+                  .docx-row {
+                    border: 1px solid #000;
                   }
-                  th, td {
-                    padding: 8px;
+                  
+                  .docx-cell, .docx-header {
+                    border: 1px solid #000;
+                    padding: 8px 12px;
+                    vertical-align: top;
                     text-align: left;
                   }
-                  th {
+                  
+                  .docx-header {
                     background-color: #f2f2f2;
                     font-weight: bold;
+                    text-align: center;
                   }
+                  
+                  /* Preserve heading styles */
+                  h1, h2, h3, h4, h5, h6 {
+                    color: #000;
+                    margin-top: 20px;
+                    margin-bottom: 10px;
+                    font-weight: bold;
+                  }
+                  
+                  h1 { font-size: 18pt; }
+                  h2 { font-size: 16pt; }
+                  h3 { font-size: 14pt; }
+                  h4 { font-size: 12pt; }
+                  
+                  /* Preserve paragraph formatting */
+                  p {
+                    margin-bottom: 10px;
+                    text-align: left;
+                    font-size: 12pt;
+                    line-height: 1.15;
+                  }
+                  
+                  /* Preserve text formatting */
+                  strong, b {
+                    font-weight: bold;
+                  }
+                  
+                  em, i {
+                    font-style: italic;
+                  }
+                  
                   .highlight {
-                    background-color: #ffffcc;
+                    background-color: #ffff00;
+                    padding: 1px 2px;
+                  }
+                  
+                  /* Preserve list formatting */
+                  ul, ol {
+                    margin: 10px 0;
+                    padding-left: 30px;
+                  }
+                  
+                  li {
+                    margin-bottom: 5px;
+                  }
+                  
+                  /* Preserve table alignment */
+                  .docx-table td[align="center"] {
+                    text-align: center;
+                  }
+                  
+                  .docx-table td[align="right"] {
+                    text-align: right;
+                  }
+                  
+                  .docx-table td[align="left"] {
+                    text-align: left;
+                  }
+                  
+                  /* Preserve colors and backgrounds */
+                  .docx-table tr:nth-child(even) {
+                    background-color: #f9f9f9;
+                  }
+                  
+                  /* Preserve spacing */
+                  .docx-table td {
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                  }
+                  
+                  /* Preserve page layout */
+                  @media print {
+                    body {
+                      margin: 0;
+                      padding: 20px;
+                    }
+                  }
+                  
+                  /* Preserve headers and footers */
+                  .docx-header {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    background: white;
+                    border-bottom: 1px solid #ccc;
+                    padding: 10px;
+                    font-size: 10pt;
+                    z-index: 1000;
+                  }
+                  
+                  .docx-footer {
+                    position: fixed;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    background: white;
+                    border-top: 1px solid #ccc;
+                    padding: 10px;
+                    font-size: 10pt;
+                    z-index: 1000;
+                  }
+                  
+                  /* Preserve page breaks */
+                  .page-break {
+                    page-break-before: always;
+                    break-before: page;
+                    margin: 20px 0;
+                    border-top: 1px dashed #ccc;
+                    padding-top: 20px;
+                  }
+                  
+                  /* Adjust body padding for headers/footers */
+                  body {
+                    padding-top: 60px;
+                    padding-bottom: 60px;
+                  }
+                  
+                  /* Ensure exact DOCX appearance */
+                  .docx-content {
+                    max-width: 100%;
+                    margin: 0 auto;
                   }
                 </style>
               </head>
               <body>
-                ${result.value}
+                <div class="docx-content">
+                  ${result.value}
+                </div>
               </body>
               </html>
             `;
@@ -1617,6 +2160,85 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
                 )}
               </div>
 
+              {/* Discount Field */}
+              <div className="group">
+                <label className="flex items-center gap-3 text-sm font-semibold text-gray-800 mb-3">
+                  <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                    <Percent className="w-4 h-4 text-white" />
+                  </div>
+                  Discount (%)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={maxAllowedDiscount}
+                  step={0.01}
+                  value={clientInfo.discount ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const discountValue = value === '' ? undefined : Number(value);
+                    
+                    // Check if discount is not allowed (total cost below $2500)
+                    if (!isDiscountAllowed && discountValue && discountValue > 0) {
+                      alert("Discount is available only for projects above $2,500");
+                      updateClientInfo({ discount: undefined });
+                      return;
+                    }
+                    
+                    // Check if user is trying to enter more than 10%
+                    if (discountValue && discountValue > 10) {
+                      alert("Discount cannot be applied more than 10%");
+                      // Reset to 10% if they try to exceed
+                      updateClientInfo({ discount: 10 });
+                      return;
+                    }
+                    
+                    // Check if discount would bring total below $2500
+                    if (discountValue && discountValue > 0) {
+                      const testFinalTotal = (calculation?.totalCost ?? safeCalculation.totalCost) * (1 - (discountValue / 100));
+                      if (testFinalTotal < 2500) {
+                        alert(`Discount cannot be applied. Final total would be $${testFinalTotal.toFixed(2)}, which is below the minimum of $2,500. Maximum allowed discount: ${maxAllowedDiscount}%`);
+                        // Reset to maximum allowed discount
+                        updateClientInfo({ discount: maxAllowedDiscount });
+                        return;
+                      }
+                    }
+                    
+                    // Ensure discount doesn't exceed maximum allowed
+                    const validDiscount = discountValue ? Math.min(discountValue, maxAllowedDiscount) : undefined;
+                    updateClientInfo({ discount: validDiscount });
+                  }}
+                  disabled={!isDiscountAllowed}
+                  className={`w-full px-5 py-4 border-2 rounded-xl focus:ring-4 transition-all duration-300 bg-white/80 backdrop-blur-sm text-lg font-medium ${
+                    !isDiscountAllowed 
+                      ? 'border-gray-200 cursor-not-allowed bg-gray-100' 
+                      : !isDiscountValid 
+                        ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500' 
+                        : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500 hover:border-blue-300'
+                  }`}
+                  placeholder={`Enter discount percentage (max 10%)`}
+                />
+                {!isDiscountAllowed && (
+                  <p className="text-sm text-gray-500 mt-2">Discount is available only for projects above $2,500.</p>
+                )}
+                {isDiscountAllowed && !isDiscountValid && clientInfo.discount && clientInfo.discount > 0 && (
+                  <p className="text-sm text-red-600 mt-2 flex items-center gap-1">
+                    <Info className="w-4 h-4" />
+                    Discount too high! Final total must remain above $2,500. Maximum allowed: {maxAllowedDiscount}%
+                  </p>
+                )}
+                {isDiscountAllowed && isDiscountValid && maxAllowedDiscount > 0 && (
+                  <p className="text-sm text-green-600 mt-2">
+                    Maximum discount allowed: {maxAllowedDiscount}% (capped at 10% and keeps total above $2,500)
+                  </p>
+                )}
+                {isDiscountAllowed && maxAllowedDiscount === 0 && (
+                  <p className="text-sm text-orange-600 mt-2">
+                    No discount available: Project total is too close to $2,500 minimum
+                  </p>
+                )}
+              </div>
+
               <button
                 type="submit"
                 className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white py-4 px-8 rounded-2xl font-bold text-lg hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl shadow-xl relative overflow-hidden group"
@@ -1652,6 +2274,34 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
                       <FileText className="w-5 h-5" />
                       Generate Agreement
                       <Sparkles className="w-5 h-5" />
+                    </>
+                  )}
+                </span>
+              </button>
+
+              {/* Send to Deal Desk Button */}
+              <button
+                type="button"
+                onClick={handleSendToDealDesk}
+                disabled={isSendingToDealDesk}
+                className={`w-full mt-4 py-4 px-8 rounded-2xl font-bold text-lg transition-all duration-500 transform shadow-xl relative overflow-hidden group ${
+                  isSendingToDealDesk
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white hover:from-purple-700 hover:via-indigo-700 hover:to-blue-700 hover:scale-105 hover:shadow-2xl'
+                }`}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                <span className="relative flex items-center justify-center gap-3">
+                  {isSendingToDealDesk ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Preparing Email...
+                    </>
+                  ) : (
+                    <>
+                      <Briefcase className="w-5 h-5" />
+                      Send to Deal Desk
+                      <Send className="w-5 h-5" />
                     </>
                   )}
                 </span>
@@ -1895,9 +2545,30 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
               <td className="text-right py-4 font-bold text-gray-900">{formatCurrency(safeCalculation.instanceCost)}</td>
             </tr>
             <tr className="border-t-2 border-blue-300 bg-gradient-to-r from-blue-50 to-indigo-50">
-              <td className="py-6 font-bold text-xl text-gray-900">Total Project Cost</td>
+              <td className="py-6 font-bold text-xl text-gray-900">Subtotal (Total Project Cost)</td>
               <td className="text-right py-6 font-bold text-2xl text-blue-600">{formatCurrency(safeCalculation.totalCost)}</td>
             </tr>
+        {(isDiscountAllowed && clientInfo.discount && clientInfo.discount > 0 && isDiscountValid && clientInfo.discount <= 10) && (
+          <tr className="border-b border-gray-200">
+            <td className="py-4 text-gray-700 font-medium">Discount ({clientInfo.discount.toString()}%)</td>
+            <td className="text-right py-4 font-bold text-red-600">- {formatCurrency(safeCalculation.totalCost * (clientInfo.discount / 100))}</td>
+          </tr>
+        )}
+        <tr className="border-t-2 border-emerald-300 bg-gradient-to-r from-emerald-50 to-teal-50">
+          <td className="py-6 font-bold text-xl text-gray-900">Total After Discount</td>
+          <td className="text-right py-6 font-bold text-2xl text-emerald-700">
+            {formatCurrency(isDiscountAllowed && isDiscountValid ? finalTotalAfterDiscount : safeCalculation.totalCost)}
+          </td>
+        </tr>
+        {isDiscountAllowed && !isDiscountValid && clientInfo.discount && clientInfo.discount > 0 && (
+          <tr className="border-b border-red-200 bg-red-50">
+            <td colSpan={2} className="py-3 text-center">
+              <p className="text-sm text-red-600 font-medium">
+                ⚠️ Discount not applied: Final total would be below $2,500 minimum
+              </p>
+            </td>
+          </tr>
+        )}
           </tbody>
         </table>
         </div>
@@ -2068,6 +2739,85 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
                 )}
             </div>
 
+            {/* Discount Field */}
+            <div className="group">
+              <label className="flex items-center gap-3 text-sm font-semibold text-gray-800 mb-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                  <Percent className="w-4 h-4 text-white" />
+                </div>
+                Discount (%)
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={maxAllowedDiscount}
+                step={0.01}
+                value={clientInfo.discount ?? ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const discountValue = value === '' ? undefined : Number(value);
+                  
+                  // Check if discount is not allowed (total cost below $2500)
+                  if (!isDiscountAllowed && discountValue && discountValue > 0) {
+                    alert("Discount is available only for projects above $2,500");
+                    setClientInfo({ ...clientInfo, discount: undefined });
+                    return;
+                  }
+                  
+                  // Check if user is trying to enter more than 10%
+                  if (discountValue && discountValue > 10) {
+                    alert("Discount cannot be applied more than 10%");
+                    // Reset to 10% if they try to exceed
+                    setClientInfo({ ...clientInfo, discount: 10 });
+                    return;
+                  }
+                  
+                  // Check if discount would bring total below $2500
+                  if (discountValue && discountValue > 0) {
+                    const testFinalTotal = (calculation?.totalCost ?? safeCalculation.totalCost) * (1 - (discountValue / 100));
+                    if (testFinalTotal < 2500) {
+                      alert(`Discount cannot be applied. Final total would be $${testFinalTotal.toFixed(2)}, which is below the minimum of $2,500. Maximum allowed discount: ${maxAllowedDiscount}%`);
+                      // Reset to maximum allowed discount
+                      setClientInfo({ ...clientInfo, discount: maxAllowedDiscount });
+                      return;
+                    }
+                  }
+                  
+                  // Ensure discount doesn't exceed maximum allowed
+                  const validDiscount = discountValue ? Math.min(discountValue, maxAllowedDiscount) : undefined;
+                  setClientInfo({ ...clientInfo, discount: validDiscount });
+                }}
+                disabled={!isDiscountAllowed}
+                className={`w-full px-5 py-4 border-2 rounded-xl focus:ring-4 transition-all duration-300 bg-white/80 backdrop-blur-sm text-lg font-medium ${
+                  !isDiscountAllowed 
+                    ? 'border-gray-200 cursor-not-allowed bg-gray-100' 
+                    : !isDiscountValid 
+                      ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500' 
+                      : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500 hover:border-blue-300'
+                }`}
+                placeholder={`Enter discount percentage (max 10%)`}
+              />
+              {!isDiscountAllowed && (
+                <p className="text-sm text-gray-500 mt-2">Discount is available only for projects above $2,500.</p>
+              )}
+              {isDiscountAllowed && !isDiscountValid && clientInfo.discount && clientInfo.discount > 0 && (
+                <p className="text-sm text-red-600 mt-2 flex items-center gap-1">
+                  <Info className="w-4 h-4" />
+                  Discount too high! Final total must remain above $2,500. Maximum allowed: {maxAllowedDiscount}%
+                </p>
+              )}
+              {isDiscountAllowed && isDiscountValid && maxAllowedDiscount > 0 && (
+                <p className="text-sm text-green-600 mt-2">
+                  Maximum discount allowed: {maxAllowedDiscount}% (capped at 10% and keeps total above $2,500)
+                </p>
+              )}
+              {isDiscountAllowed && maxAllowedDiscount === 0 && (
+                <p className="text-sm text-orange-600 mt-2">
+                  No discount available: Project total is too close to $2,500 minimum
+                </p>
+              )}
+            </div>
+
             <button
               type="submit"
               className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white py-4 px-8 rounded-2xl font-bold text-lg hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl shadow-xl relative overflow-hidden group"
@@ -2107,6 +2857,34 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
                 )}
               </span>
                   </button>
+
+            {/* Send to Deal Desk Button */}
+            <button
+              type="button"
+              onClick={handleSendToDealDesk}
+              disabled={isSendingToDealDesk}
+              className={`w-full mt-4 py-4 px-8 rounded-2xl font-bold text-lg transition-all duration-500 transform shadow-xl relative overflow-hidden group ${
+                isSendingToDealDesk
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white hover:from-purple-700 hover:via-indigo-700 hover:to-blue-700 hover:scale-105 hover:shadow-2xl'
+              }`}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+              <span className="relative flex items-center justify-center gap-3">
+                {isSendingToDealDesk ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Preparing Email...
+                  </>
+                ) : (
+                  <>
+                    <Briefcase className="w-5 h-5" />
+                    Send to Deal Desk
+                    <Send className="w-5 h-5" />
+                  </>
+                )}
+              </span>
+            </button>
           </form>
 
               </div>
@@ -2347,12 +3125,16 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
                     )}
                   </div>
                   <div className="flex-1 bg-white overflow-hidden">
-                    {showInlinePreview && previewUrl ? (
-                      <iframe
-                        src={previewUrl}
-                        className="w-full h-full border-0"
-                        title="Agreement Document Preview"
-                      />
+                    {showInlinePreview ? (
+                      previewUrl ? (
+                        <iframe
+                          src={previewUrl}
+                          className="w-full h-full border-0"
+                          title="Agreement Document Preview"
+                        />
+                      ) : (
+                        <div ref={previewContainerRef} className="w-full h-full overflow-auto p-6 bg-white" />
+                      )
                     ) : (
                       <div className="h-full flex items-center justify-center">
                         <div className="text-center p-12">

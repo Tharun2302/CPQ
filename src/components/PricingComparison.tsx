@@ -13,6 +13,11 @@ const PricingComparison: React.FC<PricingComparisonProps> = ({
   calculations,
   onSelectTier
 }) => {
+  // Filter to show only Basic and Advanced plans
+  const filteredCalculations = calculations.filter(calc => 
+    calc.tier.name === 'Basic' || calc.tier.name === 'Advanced'
+  );
+
   return (
     <div className="bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 rounded-2xl shadow-2xl border border-slate-200/50 p-8 backdrop-blur-sm">
       <div className="text-center mb-10">
@@ -22,8 +27,8 @@ const PricingComparison: React.FC<PricingComparisonProps> = ({
         <p className="text-gray-600 text-lg">Compare our pricing tiers and find the best fit for your project</p>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {calculations.map((calc) => {
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        {filteredCalculations.map((calc) => {
           
           return (
             <div
