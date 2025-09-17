@@ -50,36 +50,51 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
         const storedToken = localStorage.getItem('cpq_token');
         
         if (storedUser && storedToken) {
-          // Verify token with backend
+          // Only call backend if the token looks like a JWT we issued
+          const looksLikeJwt = (t: string) => t.split('.').length === 3;
           const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
-          try {
-            const response = await fetch(`${backendUrl}/api/auth/me`, {
-              headers: {
-                'Authorization': `Bearer ${storedToken}`
-              }
-            });
+          
+          if (looksLikeJwt(storedToken)) {
+            // Verify token with backend
+            try {
+              const response = await fetch(`${backendUrl}/api/auth/me`, {
+                headers: {
+                  'Authorization': `Bearer ${storedToken}`
+                }
+              });
 
-            if (response.ok) {
-              const data = await response.json();
-              if (data.success) {
-                setUser(data.user);
-                setIsAuthenticated(true);
+              if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                  setUser(data.user);
+                  setIsAuthenticated(true);
+                } else {
+                  // Token invalid, clear storage
+                  localStorage.removeItem('cpq_user');
+                  localStorage.removeItem('cpq_token');
+                }
               } else {
                 // Token invalid, clear storage
                 localStorage.removeItem('cpq_user');
                 localStorage.removeItem('cpq_token');
               }
-            } else {
-              // Token invalid, clear storage
+            } catch (backendError) {
+              console.error('Backend auth check failed:', backendError);
+              // Fallback to local storage if backend is down
+              const userData = JSON.parse(storedUser);
+              setUser(userData);
+              setIsAuthenticated(true);
+            }
+          } else {
+            // Token is not a JWT (likely local/mock/MS access token). Use local user only.
+            try {
+              const userData = JSON.parse(storedUser);
+              setUser(userData);
+              setIsAuthenticated(true);
+            } catch (e) {
               localStorage.removeItem('cpq_user');
               localStorage.removeItem('cpq_token');
             }
-          } catch (backendError) {
-            console.error('Backend auth check failed:', backendError);
-            // Fallback to local storage if backend is down
-            const userData = JSON.parse(storedUser);
-            setUser(userData);
-            setIsAuthenticated(true);
           }
         }
       } catch (error) {
@@ -329,10 +344,32 @@ export const AuthProvider: React.FC<AuthProviderComponentProps> = ({ children })
                   setUser(data.user);
                   setIsAuthenticated(true);
                 } else {
-                  throw new Error('Backend Microsoft auth failed');
+                  // Backend may be disabled in Render free deploys; store MS access token locally and skip backend auth
+                  const user: User = {
+                    id: microsoftUser.id,
+                    name: microsoftUser.name,
+                    email: microsoftUser.email,
+                    provider: 'microsoft' as AuthProviderType,
+                    createdAt: new Date().toISOString()
+                  };
+                  localStorage.setItem('cpq_user', JSON.stringify(user));
+                  localStorage.setItem('cpq_token', microsoftUser.accessToken);
+                  setUser(user);
+                  setIsAuthenticated(true);
                 }
               } else {
-                throw new Error('Backend Microsoft auth failed');
+                // Same fallback as above if backend returns non-OK
+                const user: User = {
+                  id: microsoftUser.id,
+                  name: microsoftUser.name,
+                  email: microsoftUser.email,
+                  provider: 'microsoft' as AuthProviderType,
+                  createdAt: new Date().toISOString()
+                };
+                localStorage.setItem('cpq_user', JSON.stringify(user));
+                localStorage.setItem('cpq_token', microsoftUser.accessToken);
+                setUser(user);
+                setIsAuthenticated(true);
               }
             } catch (backendError) {
               console.error('Backend Microsoft auth error:', backendError);

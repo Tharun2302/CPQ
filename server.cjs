@@ -359,7 +359,13 @@ app.get('/api/auth/me', async (req, res) => {
       });
     }
 
-    // Verify token
+    // Only verify server-issued JWTs (tokens with 3 parts)
+    if (token.split('.').length !== 3) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token format'
+      });
+    }
     const decoded = jwt.verify(token, JWT_SECRET);
     const user = await db.collection('users').findOne({ id: decoded.userId });
     
