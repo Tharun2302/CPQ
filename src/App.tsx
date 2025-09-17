@@ -156,7 +156,7 @@ function App() {
               uploadDate: template.uploadDate ? new Date(template.uploadDate) : new Date(),
               content: template.content || null
             };
-          }).filter(template => template !== null); // Remove invalid templates
+          }).filter((template: any) => template !== null); // Remove invalid templates
           
           setTemplates(templatesWithFiles);
           console.log('✅ Loaded templates from localStorage:', templatesWithFiles.length, 'templates');
