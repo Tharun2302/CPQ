@@ -156,10 +156,10 @@ export function calculatePricing(config: ConfigurationData, tier: PricingTier): 
 
     const instanceCost = getInstanceCost(config.instanceType, config.duration) * config.numberOfInstances;
 
-    // Managed migration cost: plan-based floor (Advanced: 800, others: 400)
+    // Managed migration cost: plan-based floors (Basic: 400, Standard: 600, Advanced: 800)
     const lookupValue = getManagedMigrationLookupValue(config.numberOfUsers, planKey);
     const s38 = (lookupValue * config.numberOfUsers) / 4;
-    const floor = planKey === 'advanced' ? 800 : 400;
+    const floor = planKey === 'advanced' ? 800 : (planKey === 'standard' ? 600 : 400);
     const migrationCost = Math.max(floor, s38);
 
     const totalCost = userCost + dataCost + instanceCost + migrationCost;
