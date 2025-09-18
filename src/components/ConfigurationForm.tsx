@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ConfigurationData } from '../types/pricing';
-import { Calculator, Users, Server, Clock, Database, ArrowRight, Sparkles, UserCheck, FileText } from 'lucide-react';
+import { Calculator, Users, Server, Clock, Database, ArrowRight, Sparkles, UserCheck, FileText, Percent } from 'lucide-react';
 
 interface DealData {
   dealId: string;
@@ -65,6 +65,9 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
     companyName2: ''
   });
 
+  // Discount state for proper display
+  const [discountValue, setDiscountValue] = useState<string>('');
+
   // Initialize contact info from deal data
   useEffect(() => {
     if (dealData) {
@@ -95,6 +98,18 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
     }
   }, [dealData]); // Removed onContactInfoChange from dependencies
 
+  // Load discount value from localStorage on component mount
+  useEffect(() => {
+    try {
+      const savedDiscount = localStorage.getItem('cpq_discount');
+      if (savedDiscount !== null && savedDiscount !== '') {
+        setDiscountValue(savedDiscount);
+      }
+    } catch {
+      setDiscountValue('');
+    }
+  }, []);
+
 
 
   const handleChange = (field: keyof ConfigurationData, value: any) => {
@@ -103,14 +118,15 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
     setConfig(newConfig);
     onConfigurationChange(newConfig);
     
-    // Auto-scroll down when migration type is selected
+    // Auto-scroll down when migration type is selected, but only if we have a target section
     if (field === 'migrationType' && value) {
       setTimeout(() => {
-        window.scrollTo({
-          top: document.documentElement.scrollHeight,
-          behavior: 'smooth'
-        });
-      }, 100); // Small delay to ensure DOM is updated
+        const target = document.querySelector('[data-section="template-selection"]')
+          || document.querySelector('[data-section="project-configuration"]');
+        if (target) {
+          (target as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 150);
     }
   };
 
@@ -288,8 +304,8 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
           </div>
 
           {/* Template Selection - Show when migration type is selected */}
-          {config.migrationType && templates.length > 0 && (
-            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl shadow-lg border border-purple-200 p-8">
+          {config.migrationType && (
+            <div data-section="template-selection" className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl shadow-lg border border-purple-200 p-8">
               <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <FileText className="w-8 h-8 text-white" />
@@ -305,36 +321,42 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
                   </div>
                   Combination
                 </label>
-                <select
-                  value={selectedTemplate?.id || ''}
-                  onChange={(e) => {
-                    const template = templates.find(t => t.id === e.target.value) || null;
-                    if (onTemplateSelect) {
-                      onTemplateSelect(template);
-                    }
-                    
-                    // Auto-scroll to Project Configuration section when template is selected
-                    if (template) {
-                      setTimeout(() => {
-                        const projectConfigSection = document.querySelector('[data-section="project-configuration"]');
-                        if (projectConfigSection) {
-                          projectConfigSection.scrollIntoView({ 
-                            behavior: 'smooth', 
-                            block: 'start' 
-                          });
-                        }
-                      }, 100); // Small delay to ensure DOM is updated
-                    }
-                  }}
-                  className="w-full px-6 py-4 border-2 border-purple-200 rounded-xl focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 bg-white/90 backdrop-blur-sm hover:border-purple-300 text-lg font-medium"
-                >
-                  <option value="">Select Combination</option>
-                  {templates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.name} {template.isDefault ? '(Default)' : ''}
-                    </option>
-                  ))}
-                </select>
+                {templates.length === 0 ? (
+                  <div className="w-full px-6 py-4 border-2 border-purple-200 rounded-xl bg-purple-50 text-purple-700 text-center text-lg font-medium">
+                    Loading templates...
+                  </div>
+                ) : (
+                  <select
+                    value={selectedTemplate?.id || ''}
+                    onChange={(e) => {
+                      const template = templates.find(t => t.id === e.target.value) || null;
+                      if (onTemplateSelect) {
+                        onTemplateSelect(template);
+                      }
+                      
+                      // Auto-scroll to Project Configuration section when template is selected
+                      if (template) {
+                        setTimeout(() => {
+                          const projectConfigSection = document.querySelector('[data-section="project-configuration"]');
+                          if (projectConfigSection) {
+                            projectConfigSection.scrollIntoView({ 
+                              behavior: 'smooth', 
+                              block: 'start' 
+                            });
+                          }
+                        }, 100); // Small delay to ensure DOM is updated
+                      }
+                    }}
+                    className="w-full px-6 py-4 border-2 border-purple-200 rounded-xl focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 bg-white/90 backdrop-blur-sm hover:border-purple-300 text-lg font-medium"
+                  >
+                    <option value="">Select Combination</option>
+                    {templates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name} {template.isDefault ? '(Default)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 
                 {selectedTemplate && (
                   <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
@@ -351,7 +373,7 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
           )}
 
           {/* Other Configuration Fields - Conditional Rendering */}
-          {config.migrationType && selectedTemplate && (
+          {config.migrationType && (
             <div data-section="project-configuration" className="bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/50 rounded-2xl shadow-2xl border border-blue-100/50 p-8 backdrop-blur-sm">
               <div className="text-center mb-8">
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">Project Configuration</h3>
@@ -482,17 +504,79 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
 
           {/* Calculate Pricing Button - Only show when migration type and template are selected */}
           {config.migrationType && selectedTemplate && (
-            <button
-              type="submit"
-              className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white py-5 px-8 rounded-2xl font-bold text-lg hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl shadow-xl relative overflow-hidden group"
-            >
-            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-              <span className="relative flex items-center justify-center gap-3">
-                <Calculator className="w-5 h-5" />
-                Calculate Pricing
-                <Sparkles className="w-5 h-5" />
-              </span>
-            </button>
+            <>
+              <button
+                type="submit"
+                className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white py-5 px-8 rounded-2xl font-bold text-lg hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl shadow-xl relative overflow-hidden group"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                <span className="relative flex items-center justify-center gap-3">
+                  <Calculator className="w-5 h-5" />
+                  Calculate Pricing
+                  <Sparkles className="w-5 h-5" />
+                </span>
+              </button>
+
+              {/* Discount Field moved from Quote session */}
+              <div className="mt-6 bg-white/70 border border-gray-200 rounded-2xl p-6">
+                <label className="flex items-center gap-3 text-sm font-semibold text-gray-800 mb-3">
+                  <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-600 rounded-lg flex items-center justify-center">
+                    <Percent className="w-4 h-4 text-white" />
+                  </div>
+                  Discount (%)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={10}
+                  step={0.01}
+                  value={discountValue}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    
+                    // Allow empty value for clearing
+                    if (raw === '') {
+                      setDiscountValue('');
+                      try { 
+                        localStorage.setItem('cpq_discount', '');
+                        window.dispatchEvent(new CustomEvent('discountUpdated'));
+                      } catch {}
+                      return;
+                    }
+                    
+                    const numValue = Number(raw);
+                    
+                    // Check if value exceeds 10%
+                    if (numValue > 10) {
+                      alert('Discount cannot be more than 10%');
+                      return; // Don't update the value
+                    }
+                    
+                    // Ensure value is not negative
+                    if (numValue < 0) {
+                      setDiscountValue('0');
+                      try { 
+                        localStorage.setItem('cpq_discount', '0');
+                        window.dispatchEvent(new CustomEvent('discountUpdated'));
+                      } catch {}
+                      return;
+                    }
+                    
+                    // Update the display value immediately
+                    setDiscountValue(raw);
+                    
+                    // Save to localStorage and notify other components
+                    try { 
+                      localStorage.setItem('cpq_discount', raw);
+                      window.dispatchEvent(new CustomEvent('discountUpdated'));
+                    } catch {}
+                  }}
+                  className="w-full px-5 py-4 border-2 rounded-xl focus:ring-4 transition-all duration-300 bg-white/80 backdrop-blur-sm text-lg font-medium border-gray-200 focus:ring-blue-500/20 focus:border-blue-500 hover:border-blue-300"
+                  placeholder={`Enter discount percentage (max 10%)`}
+                />
+                <p className="text-xs text-gray-500 mt-2">Discount is available only for projects above $2,500 and capped at 10%.</p>
+              </div>
+            </>
           )}
         </form>
       </div>

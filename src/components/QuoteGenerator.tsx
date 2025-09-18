@@ -12,8 +12,6 @@ import {
   Users, 
   Sparkles,
   Eye,
-  Percent,
-  Info,
   Briefcase
 } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -116,33 +114,94 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
     discount: undefined
   });
 
+  // Read discount entered in Configure session
+  useEffect(() => {
+    const loadDiscount = () => {
+      try {
+        const saved = localStorage.getItem('cpq_discount');
+        if (saved !== null && saved !== '' && !isNaN(Number(saved))) {
+          const val = Number(saved);
+          setClientInfo(prev => ({ ...prev, discount: val }));
+        } else {
+          // Clear discount if empty
+          setClientInfo(prev => ({ ...prev, discount: undefined }));
+        }
+      } catch {
+        setClientInfo(prev => ({ ...prev, discount: undefined }));
+      }
+    };
+
+    // Load initial discount
+    loadDiscount();
+
+    // Listen for storage events (changes from other components)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'cpq_discount') {
+        loadDiscount();
+      }
+    };
+
+    // Listen for custom events (immediate updates from same page)
+    const handleDiscountUpdate = () => {
+      loadDiscount();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('discountUpdated', handleDiscountUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('discountUpdated', handleDiscountUpdate);
+    };
+  }, []);
+
   const [showPreview, setShowPreview] = useState(false);
+  
+  // Add debugging to track discount changes
+  useEffect(() => {
+    console.log('🔍 Discount changed in QuoteGenerator:', {
+      clientInfoDiscount: clientInfo.discount,
+      discountPercent: clientInfo.discount ?? 0,
+      totalCost: calculation?.totalCost ?? safeCalculation.totalCost,
+      showPreview
+    });
+  }, [clientInfo.discount, showPreview]);
   const [showContactSelector, setShowContactSelector] = useState(false);
   const [quoteId, setQuoteId] = useState<string>('');
   const [isSendingToDealDesk, setIsSendingToDealDesk] = useState(false);
+  const [isEmailingAgreement, setIsEmailingAgreement] = useState(false);
+  
+  // Calculate discount logic - source discount primarily from Configure session (localStorage)
+  const totalCost = calculation?.totalCost ?? safeCalculation.totalCost;
+  // Read latest discount from localStorage as the source of truth, fallback to state
+  const storedDiscountPercent = (() => {
+    try {
+      const raw = localStorage.getItem('cpq_discount');
+      return raw !== null && raw !== '' && !isNaN(Number(raw)) ? Number(raw) : undefined;
+    } catch {
+      return undefined;
+    }
+  })();
+  const discountPercent = (clientInfo.discount ?? storedDiscountPercent ?? 0);
   
   // Allow discount only when total project cost exceeds $2500
-  const isDiscountAllowed = (calculation?.totalCost ?? safeCalculation.totalCost) > 2500;
+  const isDiscountAllowed = totalCost >= 2500;
+  
+  // Check if user has entered a valid discount
+  const hasValidDiscount = discountPercent > 0 && discountPercent <= 10;
   
   // Calculate final total after discount
-  const discountPercent = clientInfo.discount ?? 0;
-  const finalTotalAfterDiscount = (calculation?.totalCost ?? safeCalculation.totalCost) * (1 - (discountPercent / 100));
+  const discountAmount = hasValidDiscount ? totalCost * (discountPercent / 100) : 0;
+  const finalTotalAfterDiscount = totalCost - discountAmount;
   
-  // Check if discount would bring total below $2500
-  const isDiscountValid = finalTotalAfterDiscount >= 2500;
+  // Check if discount would bring total below $2500 - if so, don't apply
+  const isDiscountValid = hasValidDiscount ? finalTotalAfterDiscount >= 2500 : true;
   
-  // Maximum allowed discount percentage to keep total above $2500, but capped at 10%
-  const maxDiscountForMinimum = isDiscountAllowed ? 
-    Math.max(0, Math.floor(((calculation?.totalCost ?? safeCalculation.totalCost) - 2500) / (calculation?.totalCost ?? safeCalculation.totalCost) * 100)) : 0;
+  // Should we show and apply the discount?
+  const shouldApplyDiscount = isDiscountAllowed && hasValidDiscount && isDiscountValid;
   
-  const maxAllowedDiscount = Math.min(maxDiscountForMinimum, 10); // Cap at 10%
+  
 
-  // Reset discount when it is not allowed or would bring total below $2500
-  useEffect(() => {
-    if ((!isDiscountAllowed || !isDiscountValid) && clientInfo.discount && clientInfo.discount > 0) {
-      setClientInfo({ ...clientInfo, discount: undefined });
-    }
-  }, [isDiscountAllowed, isDiscountValid]);
 
   // Generate unique quote ID
   const generateUniqueQuoteId = (): string => {
@@ -395,7 +454,7 @@ PRICING BREAKDOWN (${safeCalculation.tier.name} Plan):
 - Instance Costs: ${formatCurrency(safeCalculation.instanceCost)}
 - Subtotal: ${formatCurrency(safeCalculation.totalCost)}
 ${(clientInfo.discount ?? 0) > 0 ? `- Discount (${clientInfo.discount}%): -${formatCurrency(safeCalculation.totalCost * ((clientInfo.discount ?? 0) / 100))}` : ''}
-- Final Total: ${formatCurrency(finalTotalAfterDiscount)}
+- Final Total: ${formatCurrency(shouldApplyDiscount ? finalTotalAfterDiscount : totalCost)}
 
 DEAL INFORMATION:
 - Deal ID: ${dealData?.dealId || 'N/A'}
@@ -431,6 +490,283 @@ Quote ID: ${quoteData.id}
     }
   };
 
+  // Send generated agreement via email (DOCX attachment)
+  const handleEmailAgreement = async () => {
+    try {
+      if (!selectedTemplate) {
+        alert('Please select a template first in the Template session.');
+        return;
+      }
+
+      setIsEmailingAgreement(true);
+
+      // Ensure we have an agreement generated
+      let agreementBlob: Blob | null = processedAgreement;
+
+      if (!agreementBlob && selectedTemplate?.file && selectedTemplate.file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        const { DocxTemplateProcessor } = await import('../utils/docxTemplateProcessor');
+
+        const companyName = (configureContactInfo?.company || clientInfo.company || 'Demo Company Inc.');
+        const finalCompanyName = (!companyName || companyName === 'undefined' || companyName === 'null' || companyName === '') ? 'Demo Company Inc.' : companyName;
+        const userCount = configuration?.numberOfUsers || 1;
+        const userCost = calculation?.userCost ?? safeCalculation.userCost;
+        const migrationCost = calculation?.migrationCost ?? safeCalculation.migrationCost;
+        const totalCost = calculation?.totalCost ?? safeCalculation.totalCost;
+        const duration = configuration?.duration || 1;
+        const migrationType = configuration?.migrationType || 'Content';
+        const clientName = clientInfo.clientName || 'Demo Client';
+        const clientEmail = clientInfo.clientEmail || 'demo@example.com';
+
+        // Calculate comprehensive pricing breakdown
+        const dataCost = calculation?.dataCost ?? safeCalculation.dataCost;
+        const instanceCost = calculation?.instanceCost ?? safeCalculation.instanceCost;
+        const tierName = calculation?.tier?.name ?? safeCalculation.tier.name;
+        const instanceType = configuration?.instanceType || 'Standard';
+        const numberOfInstances = configuration?.numberOfInstances || 1;
+        const dataSizeGB = configuration?.dataSizeGB || 0;
+        
+        // Calculate discount for this function scope
+        const localDiscountPercent = clientInfo.discount ?? 0;
+        const localDiscountAmount = localDiscountPercent > 0 ? totalCost * (localDiscountPercent / 100) : 0;
+        
+        const templateData: Record<string, string> = {
+          // Core company and client information
+          '{{Company Name}}': finalCompanyName,
+          '{{ Company Name }}': finalCompanyName,
+          '{{Company_Name}}': finalCompanyName,
+          '{{ Company_Name }}': finalCompanyName,
+          '{{company name}}': finalCompanyName,
+          '{{clientName}}': clientName,
+          '{{client_name}}': clientName,
+          '{{email}}': clientEmail,
+          '{{client_email}}': clientEmail,
+          
+          // Project configuration
+          '{{users_count}}': (userCount || 1).toString(),
+          '{{userscount}}': (userCount || 1).toString(),
+          '{{users}}': (userCount || 1).toString(),
+          '{{number_of_users}}': (userCount || 1).toString(),
+          '{{instance_type}}': instanceType,
+          '{{instanceType}}': instanceType,
+          '{{number_of_instances}}': numberOfInstances.toString(),
+          '{{numberOfInstances}}': numberOfInstances.toString(),
+          '{{instances}}': numberOfInstances.toString(),
+          '{{Duration of months}}': (duration || 1).toString(),
+          '{{Duration_of_months}}': (duration || 1).toString(),
+          '{{Suration_of_months}}': (duration || 1).toString(), // Handle typo version
+          '{{duration_months}}': (duration || 1).toString(),
+          '{{duration}}': (duration || 1).toString(),
+          '{{migration type}}': migrationType,
+          '{{migration_type}}': migrationType,
+          '{{migrationType}}': migrationType,
+          '{{data_size}}': dataSizeGB.toString(),
+          '{{dataSizeGB}}': dataSizeGB.toString(),
+          '{{data_size_gb}}': dataSizeGB.toString(),
+          
+          // Pricing breakdown - all costs
+          '{{users_cost}}': formatCurrency(userCost || 0),
+          '{{user_cost}}': formatCurrency(userCost || 0),
+          '{{userCost}}': formatCurrency(userCost || 0),
+          '{{price_data}}': formatCurrency(dataCost),
+          '{{data_cost}}': formatCurrency(dataCost),
+          '{{dataCost}}': formatCurrency(dataCost),
+          '{{price_migration}}': formatCurrency(migrationCost || 0),
+          '{{migration_cost}}': formatCurrency(migrationCost || 0),
+          '{{migration_price}}': formatCurrency(migrationCost || 0),
+          '{{migrationCost}}': formatCurrency(migrationCost || 0),
+          '{{instance_cost}}': formatCurrency(instanceCost),
+          '{{instanceCost}}': formatCurrency(instanceCost),
+          '{{instance_costs}}': formatCurrency(instanceCost),
+          
+          // Total pricing
+          '{{total price}}': formatCurrency(totalCost || 0),
+          '{{total_price}}': formatCurrency(totalCost || 0),
+          '{{totalPrice}}': formatCurrency(totalCost || 0),
+          '{{prices}}': formatCurrency(totalCost || 0),
+          '{{subtotal}}': formatCurrency(totalCost || 0),
+          '{{sub_total}}': formatCurrency(totalCost || 0),
+          
+          // Discount information
+          '{{discount}}': (shouldApplyDiscount ? discountPercent : 0).toString(),
+          '{{discount_percent}}': (shouldApplyDiscount ? discountPercent : 0).toString(),
+          '{{discount_percentage}}': (shouldApplyDiscount ? discountPercent : 0).toString(),
+          '{{discount_amount}}': formatCurrency(shouldApplyDiscount ? localDiscountAmount : 0),
+          '{{discountAmount}}': formatCurrency(shouldApplyDiscount ? localDiscountAmount : 0),
+          '{{total_after_discount}}': formatCurrency(shouldApplyDiscount ? finalTotalAfterDiscount : totalCost),
+          '{{total_price_discount}}': formatCurrency(shouldApplyDiscount ? finalTotalAfterDiscount : totalCost),
+          '{{final_total}}': formatCurrency(shouldApplyDiscount ? finalTotalAfterDiscount : totalCost),
+          '{{finalTotal}}': formatCurrency(shouldApplyDiscount ? finalTotalAfterDiscount : totalCost),
+          
+          // Plan and tier information
+          '{{tier_name}}': tierName,
+          '{{tierName}}': tierName,
+          '{{plan_name}}': tierName,
+          '{{planName}}': tierName,
+          '{{plan}}': tierName,
+          
+          // Date information
+          '{{date}}': new Date().toLocaleDateString('en-US', { year: '2-digit', month: '2-digit', day: '2-digit' }),
+          '{{Date}}': new Date().toLocaleDateString('en-US', { year: '2-digit', month: '2-digit', day: '2-digit' }),
+          '{{current_date}}': new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+          '{{currentDate}}': new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+          '{{generation_date}}': new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+          
+          // Deal information (if available)
+          '{{deal_id}}': dealData?.dealId || 'N/A',
+          '{{dealId}}': dealData?.dealId || 'N/A',
+          '{{deal_name}}': dealData?.dealName || 'N/A',
+          '{{dealName}}': dealData?.dealName || 'N/A',
+          '{{deal_amount}}': dealData?.amount || 'N/A',
+          '{{dealAmount}}': dealData?.amount || 'N/A',
+          '{{deal_stage}}': dealData?.stage || 'N/A',
+          '{{dealStage}}': dealData?.stage || 'N/A',
+          
+          // Additional metadata
+          '{{template_name}}': selectedTemplate?.name || 'Default Template',
+          '{{templateName}}': selectedTemplate?.name || 'Default Template',
+          '{{agreement_id}}': `AGR-${Date.now().toString().slice(-8)}`,
+          '{{agreementId}}': `AGR-${Date.now().toString().slice(-8)}`,
+          '{{quote_id}}': `QTE-${Date.now().toString().slice(-8)}`,
+          '{{quoteId}}': `QTE-${Date.now().toString().slice(-8)}`
+        };
+
+        const result = await DocxTemplateProcessor.processDocxTemplate(selectedTemplate.file as File, templateData);
+        if (result.success && result.processedDocx) {
+          agreementBlob = result.processedDocx;
+          setProcessedAgreement(result.processedDocx);
+        } else {
+          alert('Failed to generate the agreement. Please try again.');
+          setIsEmailingAgreement(false);
+          return;
+        }
+      }
+
+      if (!agreementBlob) {
+        alert('Agreement not generated yet. Click Generate Agreement first.');
+        setIsEmailingAgreement(false);
+        return;
+      }
+
+      const toDefault = clientInfo.clientEmail || '';
+      const to = window.prompt('Enter recipient email address', toDefault);
+      if (!to) {
+        setIsEmailingAgreement(false);
+        return;
+      }
+
+      const subject = `CloudFuze Service Agreement - ${clientInfo.company || 'Client'} - ${new Date().toLocaleDateString()}`;
+      
+      // Calculate all pricing components
+      const userCost = calculation?.userCost ?? safeCalculation.userCost;
+      const dataCost = calculation?.dataCost ?? safeCalculation.dataCost;
+      const migrationCost = calculation?.migrationCost ?? safeCalculation.migrationCost;
+      const instanceCost = calculation?.instanceCost ?? safeCalculation.instanceCost;
+      const subtotal = calculation?.totalCost ?? safeCalculation.totalCost;
+      const discountAmount = (clientInfo.discount ?? 0) > 0 ? (subtotal * ((clientInfo.discount ?? 0) / 100)) : 0;
+      const finalTotal = shouldApplyDiscount ? finalTotalAfterDiscount : subtotal;
+      const tierName = calculation?.tier?.name ?? safeCalculation.tier.name;
+      
+      const message = `Dear ${clientInfo.clientName || 'Valued Client'},
+
+Thank you for choosing CloudFuze for your data migration needs. Please find your comprehensive service agreement attached for review.
+
+CLIENT INFORMATION:
+- Client Name: ${clientInfo.clientName || 'N/A'}
+- Email: ${clientInfo.clientEmail || 'N/A'}
+- Company: ${clientInfo.company || 'N/A'}
+- Discount Applied: ${clientInfo.discount || 0}%
+
+PROJECT CONFIGURATION:
+- Number of Users: ${configuration?.numberOfUsers || 'N/A'}
+- Instance Type: ${configuration?.instanceType || 'N/A'}
+- Number of Instances: ${configuration?.numberOfInstances || 'N/A'}
+- Duration: ${configuration?.duration || 'N/A'} months
+- Migration Type: ${configuration?.migrationType || 'N/A'}
+- Data Size: ${configuration?.dataSizeGB || 'N/A'} GB
+
+PRICING BREAKDOWN (${tierName} Plan):
+- User Costs: ${formatCurrency(userCost)}
+- Data Costs: ${formatCurrency(dataCost)}
+- Migration Services: ${formatCurrency(migrationCost)}
+- Instance Costs: ${formatCurrency(instanceCost)}
+- Subtotal: ${formatCurrency(subtotal)}
+${discountAmount > 0 ? `- Discount (${clientInfo.discount}%): -${formatCurrency(discountAmount)}` : ''}
+- Final Total: ${formatCurrency(finalTotal)}
+
+${dealData ? `DEAL INFORMATION:
+- Deal ID: ${dealData.dealId || 'N/A'}
+- Deal Name: ${dealData.dealName || 'N/A'}
+- Deal Amount: ${dealData.amount || 'N/A'}
+- Deal Stage: ${dealData.stage || 'N/A'}
+
+` : ''}NEXT STEPS:
+1. Review the attached service agreement carefully
+2. Contact us with any questions or concerns
+3. Sign and return the agreement to proceed
+4. Our team will begin migration setup upon receipt
+
+SUPPORT CONTACT:
+For questions about this agreement or your migration project, please contact:
+- Email: support@cloudfuze.com
+- Phone: +1 (555) 123-4567
+- Portal: https://portal.cloudfuze.com
+
+Thank you for trusting CloudFuze with your data migration needs. We look forward to delivering a successful migration experience!
+
+Best regards,
+CloudFuze Sales Team
+
+---
+This agreement was generated on ${new Date().toLocaleString()} using CloudFuze CPQ Pro.
+Agreement ID: AGR-${Date.now().toString().slice(-8)}
+Template: ${selectedTemplate?.name || 'Default Template'}`;
+
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const formData = new FormData();
+      formData.append('to', to);
+      formData.append('subject', subject);
+      formData.append('message', message);
+
+      const filenameBase = (clientInfo.company || 'Company').replace(/[^a-zA-Z0-9]/g, '_');
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const file = new File([agreementBlob], `${filenameBase}_Agreement_${timestamp}.docx`, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      formData.append('attachment', file);
+
+      const response = await fetch(`${backendUrl}/api/email/send`, { method: 'POST', body: formData });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        
+        // Handle specific email configuration errors
+        if (response.status === 500 && errorData.message?.includes('Email configuration not set')) {
+          alert(`❌ Email Not Configured\n\nThe server needs email configuration to send emails.\n\nPlease contact your administrator to:\n1. Create a .env file with EMAIL_USER and EMAIL_PASS\n2. Set up Gmail App Password\n3. Restart the server\n\nAlternatively, you can download the agreement and send it manually.`);
+          return;
+        }
+        
+        throw new Error(errorData.message || `Server error ${response.status}`);
+      }
+      const result = await response.json();
+      if (result?.success) {
+        alert('✅ Agreement emailed successfully to ' + to + '!');
+      } else {
+        throw new Error(result?.message || 'Unknown server response');
+      }
+    } catch (err: any) {
+      console.error('Error emailing agreement:', err);
+      
+      // Provide helpful error messages
+      const errorMessage = err.message || 'Unknown error';
+      if (errorMessage.includes('Network')) {
+        alert('❌ Network Error\n\nCould not connect to the server. Please check:\n• Is the backend server running?\n• Is the server URL correct?\n• Check your internet connection');
+      } else if (errorMessage.includes('credentials') || errorMessage.includes('authentication')) {
+        alert('❌ Email Authentication Failed\n\nEmail credentials are invalid. Please contact your administrator to:\n• Verify Gmail credentials in .env file\n• Check if App Password is correct\n• Restart the server after updating credentials');
+      } else {
+        alert(`❌ Failed to send agreement email\n\nError: ${errorMessage}\n\nPlease try again or download the agreement manually.`);
+      }
+    } finally {
+      setIsEmailingAgreement(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -452,7 +788,7 @@ Quote ID: ${quoteData.id}
     }
     
     if (onGenerateQuote) {
-      // Create quote object with deal information
+      // Create quote object with deal information including discount
       const quoteData: Quote = {
         id: `quote-001`,
         clientName: clientInfo.clientName,
@@ -468,7 +804,8 @@ Quote ID: ${quoteData.id}
           name: selectedTemplate.name,
           isDefault: false
         } : { id: 'default', name: 'Default Template', isDefault: true },
-        dealData: dealData
+        dealData: dealData,
+        discount: clientInfo.discount // Add discount to quote data
       };
       
       console.log('📝 Sending quote data:', quoteData);
@@ -518,6 +855,10 @@ Quote ID: ${quoteData.id}
       '{{price_data}}': formatCurrency(safeCalculation.userCost + safeCalculation.dataCost + safeCalculation.instanceCost),
       '{{Duration of months}}': quote.configuration.duration.toString(),
       '{{total price}}': formatCurrency(safeCalculation.totalCost),
+      // New tokens related to discount and final total
+      '{{discount_amount}}': formatCurrency(shouldApplyDiscount ? discountAmount : 0),
+      '{{total_after_discount}}': formatCurrency(shouldApplyDiscount ? finalTotalAfterDiscount : totalCost),
+      '{{total_price_discount}}': formatCurrency(shouldApplyDiscount ? finalTotalAfterDiscount : totalCost),
       
       // Additional mappings for compatibility
       '{{company_name}}': quote.company || 'Company Name',
@@ -536,11 +877,9 @@ Quote ID: ${quoteData.id}
         day: '2-digit' 
       }),
         '{{instance_cost}}': formatCurrency(safeCalculation.instanceCost),
-        '{{discount}}': (isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? clientInfo.discount : 0).toString(),
-        '{{discount_percent}}': (isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? clientInfo.discount : 0).toString(),
-        '{{discount_amount}}': formatCurrency(isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? (safeCalculation.totalCost * (clientInfo.discount / 100)) : 0),
-        '{{total_after_discount}}': formatCurrency(isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? finalTotalAfterDiscount : safeCalculation.totalCost),
-        '{{final_total}}': formatCurrency(isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? finalTotalAfterDiscount : safeCalculation.totalCost)
+        '{{discount}}': (shouldApplyDiscount ? discountPercent : 0).toString(),
+        '{{discount_percent}}': (shouldApplyDiscount ? discountPercent : 0).toString(),
+        '{{final_total}}': formatCurrency(shouldApplyDiscount ? finalTotalAfterDiscount : totalCost)
     };
 
     // Create sample template text with placeholders - matches CloudFuze template
@@ -1380,51 +1719,114 @@ Total Price: {{total price}}`;
           console.log('  quoteData.calculation.totalCost:', quoteData.calculation?.totalCost);
         }
         
-        // CRITICAL: Create template data with EXACT tokens from your template
-        // Based on the template images you provided
+        // CRITICAL: Create comprehensive template data with ALL tokens for your template
+        // Calculate comprehensive pricing breakdown for consistency
+        const dataCost = quoteData.calculation?.dataCost || 0;
+        const instanceCost = quoteData.calculation?.instanceCost || 0;
+        const tierName = quoteData.calculation?.tier?.name || 'Advanced';
+        const instanceType = quoteData.configuration?.instanceType || 'Standard';
+        const numberOfInstances = quoteData.configuration?.numberOfInstances || 1;
+        const dataSizeGB = quoteData.configuration?.dataSizeGB || 0;
+        
         const templateData: Record<string, string> = {
-          // EXACT tokens from your template (matching the DOCX file exactly)
+          // Core company and client information
           '{{Company Name}}': finalCompanyName || 'Demo Company Inc.',
-          '{{ Company Name }}': finalCompanyName || 'Demo Company Inc.', // Space version with extra spaces (from third page)
-          '{{Company_Name}}': finalCompanyName || 'Demo Company Inc.', // Underscore version found in template
-          '{{ Company_Name }}': finalCompanyName || 'Demo Company Inc.', // Underscore version with extra spaces (from third page)
-          '{{users_count}}': (userCount || 1).toString(),
-          '{{users_cost}}': formatCurrency(userCost || 0), // FIXED: Template uses underscore, not dot
-          '{{Duration of months}}': (duration || 1).toString(),
-          '{{Duration_of_months}}': (duration || 1).toString(), // Underscore version found in template
-          '{{Suration_of_months}}': (duration || 1).toString(), // Handle typo version
-          '{{total price}}': formatCurrency(totalCost || 0),
-          '{{total_price}}': formatCurrency(totalCost || 0), // Underscore version found in template
-          '{{price_migration}}': formatCurrency(migrationCost || 0),
-          
-          // Additional common tokens for compatibility
-          '{{company name}}': finalCompanyName || 'Demo Company Inc.', // Lowercase version found in template
-          '{{migration type}}': migrationType || 'Content',
-          '{{userscount}}': (userCount || 1).toString(),
-          '{{price_data}}': formatCurrency(quoteData.calculation?.dataCost || 0),
+          '{{ Company Name }}': finalCompanyName || 'Demo Company Inc.',
+          '{{Company_Name}}': finalCompanyName || 'Demo Company Inc.',
+          '{{ Company_Name }}': finalCompanyName || 'Demo Company Inc.',
+          '{{company name}}': finalCompanyName || 'Demo Company Inc.',
           '{{clientName}}': clientName || 'Demo Client',
+          '{{client_name}}': clientName || 'Demo Client',
           '{{email}}': clientEmail || 'demo@example.com',
+          '{{client_email}}': clientEmail || 'demo@example.com',
+          
+          // Project configuration
+          '{{users_count}}': (userCount || 1).toString(),
+          '{{userscount}}': (userCount || 1).toString(),
           '{{users}}': (userCount || 1).toString(),
-          '{{migration_type}}': migrationType || 'Content',
-          '{{prices}}': formatCurrency(totalCost || 0),
-          '{{migration_price}}': formatCurrency(migrationCost || 0),
+          '{{number_of_users}}': (userCount || 1).toString(),
+          '{{instance_type}}': instanceType,
+          '{{instanceType}}': instanceType,
+          '{{number_of_instances}}': numberOfInstances.toString(),
+          '{{numberOfInstances}}': numberOfInstances.toString(),
+          '{{instances}}': numberOfInstances.toString(),
+          '{{Duration of months}}': (duration || 1).toString(),
+          '{{Duration_of_months}}': (duration || 1).toString(),
+          '{{Suration_of_months}}': (duration || 1).toString(), // Handle typo version
           '{{duration_months}}': (duration || 1).toString(),
-          '{{date}}': new Date().toLocaleDateString('en-US', {
-            year: '2-digit', 
-            month: '2-digit', 
-            day: '2-digit' 
-          }),
-          '{{Date}}': new Date().toLocaleDateString('en-US', {
-            year: '2-digit', 
-            month: '2-digit', 
-            day: '2-digit' 
-          }),
-        '{{instance_cost}}': formatCurrency(quoteData.calculation?.instanceCost || 0),
-        '{{discount}}': (isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? clientInfo.discount : 0).toString(),
-        '{{discount_percent}}': (isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? clientInfo.discount : 0).toString(),
-        '{{discount_amount}}': formatCurrency(isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? (totalCost * (clientInfo.discount / 100)) : 0),
-        '{{total_after_discount}}': formatCurrency(isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? finalTotalAfterDiscount : totalCost),
-        '{{final_total}}': formatCurrency(isDiscountAllowed && isDiscountValid && clientInfo.discount && clientInfo.discount <= 10 ? finalTotalAfterDiscount : totalCost)
+          '{{duration}}': (duration || 1).toString(),
+          '{{migration type}}': migrationType || 'Content',
+          '{{migration_type}}': migrationType || 'Content',
+          '{{migrationType}}': migrationType || 'Content',
+          '{{data_size}}': dataSizeGB.toString(),
+          '{{dataSizeGB}}': dataSizeGB.toString(),
+          '{{data_size_gb}}': dataSizeGB.toString(),
+          
+          // Pricing breakdown - all costs
+          '{{users_cost}}': formatCurrency(userCost || 0),
+          '{{user_cost}}': formatCurrency(userCost || 0),
+          '{{userCost}}': formatCurrency(userCost || 0),
+          '{{price_data}}': formatCurrency(dataCost),
+          '{{data_cost}}': formatCurrency(dataCost),
+          '{{dataCost}}': formatCurrency(dataCost),
+          '{{price_migration}}': formatCurrency(migrationCost || 0),
+          '{{migration_cost}}': formatCurrency(migrationCost || 0),
+          '{{migration_price}}': formatCurrency(migrationCost || 0),
+          '{{migrationCost}}': formatCurrency(migrationCost || 0),
+          '{{instance_cost}}': formatCurrency(instanceCost),
+          '{{instanceCost}}': formatCurrency(instanceCost),
+          '{{instance_costs}}': formatCurrency(instanceCost),
+          
+          // Total pricing
+          '{{total price}}': formatCurrency(totalCost || 0),
+          '{{total_price}}': formatCurrency(totalCost || 0),
+          '{{totalPrice}}': formatCurrency(totalCost || 0),
+          '{{prices}}': formatCurrency(totalCost || 0),
+          '{{subtotal}}': formatCurrency(totalCost || 0),
+          '{{sub_total}}': formatCurrency(totalCost || 0),
+          
+          // Discount information
+        '{{discount}}': (shouldApplyDiscount ? discountPercent : 0).toString(),
+        '{{discount_percent}}': (shouldApplyDiscount ? discountPercent : 0).toString(),
+          '{{discount_percentage}}': (shouldApplyDiscount ? discountPercent : 0).toString(),
+        '{{discount_amount}}': formatCurrency(shouldApplyDiscount ? discountAmount : 0),
+          '{{discountAmount}}': formatCurrency(shouldApplyDiscount ? discountAmount : 0),
+        '{{total_after_discount}}': formatCurrency(shouldApplyDiscount ? finalTotalAfterDiscount : totalCost),
+          '{{total_price_discount}}': formatCurrency(shouldApplyDiscount ? finalTotalAfterDiscount : totalCost),
+          '{{final_total}}': formatCurrency(shouldApplyDiscount ? finalTotalAfterDiscount : totalCost),
+          '{{finalTotal}}': formatCurrency(shouldApplyDiscount ? finalTotalAfterDiscount : totalCost),
+          
+          // Plan and tier information
+          '{{tier_name}}': tierName,
+          '{{tierName}}': tierName,
+          '{{plan_name}}': tierName,
+          '{{planName}}': tierName,
+          '{{plan}}': tierName,
+          
+          // Date information
+          '{{date}}': new Date().toLocaleDateString('en-US', { year: '2-digit', month: '2-digit', day: '2-digit' }),
+          '{{Date}}': new Date().toLocaleDateString('en-US', { year: '2-digit', month: '2-digit', day: '2-digit' }),
+          '{{current_date}}': new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+          '{{currentDate}}': new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+          '{{generation_date}}': new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+          
+          // Deal information (if available)
+          '{{deal_id}}': dealData?.dealId || 'N/A',
+          '{{dealId}}': dealData?.dealId || 'N/A',
+          '{{deal_name}}': dealData?.dealName || 'N/A',
+          '{{dealName}}': dealData?.dealName || 'N/A',
+          '{{deal_amount}}': dealData?.amount || 'N/A',
+          '{{dealAmount}}': dealData?.amount || 'N/A',
+          '{{deal_stage}}': dealData?.stage || 'N/A',
+          '{{dealStage}}': dealData?.stage || 'N/A',
+          
+          // Additional metadata
+          '{{template_name}}': selectedTemplate?.name || 'Default Template',
+          '{{templateName}}': selectedTemplate?.name || 'Default Template',
+          '{{agreement_id}}': `AGR-${Date.now().toString().slice(-8)}`,
+          '{{agreementId}}': `AGR-${Date.now().toString().slice(-8)}`,
+          '{{quote_id}}': `QTE-${Date.now().toString().slice(-8)}`,
+          '{{quoteId}}': `QTE-${Date.now().toString().slice(-8)}`
         };
         
         console.log('🔍 TEMPLATE DATA CREATED:');
@@ -2160,84 +2562,7 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
                 )}
               </div>
 
-              {/* Discount Field */}
-              <div className="group">
-                <label className="flex items-center gap-3 text-sm font-semibold text-gray-800 mb-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                    <Percent className="w-4 h-4 text-white" />
-                  </div>
-                  Discount (%)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={maxAllowedDiscount}
-                  step={0.01}
-                  value={clientInfo.discount ?? ''}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    const discountValue = value === '' ? undefined : Number(value);
-                    
-                    // Check if discount is not allowed (total cost below $2500)
-                    if (!isDiscountAllowed && discountValue && discountValue > 0) {
-                      alert("Discount is available only for projects above $2,500");
-                      updateClientInfo({ discount: undefined });
-                      return;
-                    }
-                    
-                    // Check if user is trying to enter more than 10%
-                    if (discountValue && discountValue > 10) {
-                      alert("Discount cannot be applied more than 10%");
-                      // Reset to 10% if they try to exceed
-                      updateClientInfo({ discount: 10 });
-                      return;
-                    }
-                    
-                    // Check if discount would bring total below $2500
-                    if (discountValue && discountValue > 0) {
-                      const testFinalTotal = (calculation?.totalCost ?? safeCalculation.totalCost) * (1 - (discountValue / 100));
-                      if (testFinalTotal < 2500) {
-                        alert(`Discount cannot be applied. Final total would be $${testFinalTotal.toFixed(2)}, which is below the minimum of $2,500. Maximum allowed discount: ${maxAllowedDiscount}%`);
-                        // Reset to maximum allowed discount
-                        updateClientInfo({ discount: maxAllowedDiscount });
-                        return;
-                      }
-                    }
-                    
-                    // Ensure discount doesn't exceed maximum allowed
-                    const validDiscount = discountValue ? Math.min(discountValue, maxAllowedDiscount) : undefined;
-                    updateClientInfo({ discount: validDiscount });
-                  }}
-                  disabled={!isDiscountAllowed}
-                  className={`w-full px-5 py-4 border-2 rounded-xl focus:ring-4 transition-all duration-300 bg-white/80 backdrop-blur-sm text-lg font-medium ${
-                    !isDiscountAllowed 
-                      ? 'border-gray-200 cursor-not-allowed bg-gray-100' 
-                      : !isDiscountValid 
-                        ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500' 
-                        : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500 hover:border-blue-300'
-                  }`}
-                  placeholder={`Enter discount percentage (max 10%)`}
-                />
-                {!isDiscountAllowed && (
-                  <p className="text-sm text-gray-500 mt-2">Discount is available only for projects above $2,500.</p>
-                )}
-                {isDiscountAllowed && !isDiscountValid && clientInfo.discount && clientInfo.discount > 0 && (
-                  <p className="text-sm text-red-600 mt-2 flex items-center gap-1">
-                    <Info className="w-4 h-4" />
-                    Discount too high! Final total must remain above $2,500. Maximum allowed: {maxAllowedDiscount}%
-                  </p>
-                )}
-                {isDiscountAllowed && isDiscountValid && maxAllowedDiscount > 0 && (
-                  <p className="text-sm text-green-600 mt-2">
-                    Maximum discount allowed: {maxAllowedDiscount}% (capped at 10% and keeps total above $2,500)
-                  </p>
-                )}
-                {isDiscountAllowed && maxAllowedDiscount === 0 && (
-                  <p className="text-sm text-orange-600 mt-2">
-                    No discount available: Project total is too close to $2,500 minimum
-                  </p>
-                )}
-              </div>
+              {/* Discount field moved to Configure session */}
 
               <button
                 type="submit"
@@ -2274,6 +2599,34 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
                       <FileText className="w-5 h-5" />
                       Generate Agreement
                       <Sparkles className="w-5 h-5" />
+                    </>
+                  )}
+                </span>
+              </button>
+
+              {/* Email Agreement Button */}
+              <button
+                type="button"
+                onClick={handleEmailAgreement}
+                disabled={isEmailingAgreement || !selectedTemplate}
+                className={`w-full mt-4 py-4 px-8 rounded-2xl font-bold text-lg transition-all duration-500 transform shadow-xl relative overflow-hidden group ${
+                  isEmailingAgreement
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white hover:from-emerald-700 hover:via-teal-700 hover:to-cyan-700 hover:scale-105 hover:shadow-2xl'
+                }`}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                <span className="relative flex items-center justify-center gap-3">
+                  {isEmailingAgreement ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="w-5 h-5" />
+                      Email Agreement
+                      <Send className="w-5 h-5" />
                     </>
                   )}
                 </span>
@@ -2419,7 +2772,16 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
   }
 
   const QuotePreview = ({ dealData }: { dealData?: any }) => {
-    // Debug logging removed to prevent console spam
+    // Debug the discount values in QuotePreview
+    console.log('🔍 QuotePreview render with discount values:', {
+      clientInfoDiscount: clientInfo.discount,
+      discountPercent,
+      shouldApplyDiscount,
+      discountAmount,
+      finalTotalAfterDiscount,
+      totalCost
+    });
+    
     return (
     <div data-quote-preview className="bg-gradient-to-br from-white via-slate-50/30 to-blue-50/20 p-10 border-2 border-blue-100 rounded-2xl shadow-2xl max-w-5xl mx-auto backdrop-blur-sm">
       {/* Header */}
@@ -2546,21 +2908,29 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
             </tr>
             <tr className="border-t-2 border-blue-300 bg-gradient-to-r from-blue-50 to-indigo-50">
               <td className="py-6 font-bold text-xl text-gray-900">Subtotal (Total Project Cost)</td>
-              <td className="text-right py-6 font-bold text-2xl text-blue-600">{formatCurrency(safeCalculation.totalCost)}</td>
+              <td className="text-right py-6 font-bold text-2xl text-blue-600">{formatCurrency(totalCost)}</td>
             </tr>
-        {(isDiscountAllowed && clientInfo.discount && clientInfo.discount > 0 && isDiscountValid && clientInfo.discount <= 10) && (
+{shouldApplyDiscount && (
           <tr className="border-b border-gray-200">
-            <td className="py-4 text-gray-700 font-medium">Discount ({clientInfo.discount.toString()}%)</td>
-            <td className="text-right py-4 font-bold text-red-600">- {formatCurrency(safeCalculation.totalCost * (clientInfo.discount / 100))}</td>
+            <td className="py-4 text-gray-700 font-medium">Discount ({discountPercent.toString()}%)</td>
+            <td className="text-right py-4 font-bold text-red-600">- {formatCurrency(discountAmount)}</td>
           </tr>
         )}
+        {/* Debug: Always show discount debug info - see console */}
         <tr className="border-t-2 border-emerald-300 bg-gradient-to-r from-emerald-50 to-teal-50">
           <td className="py-6 font-bold text-xl text-gray-900">Total After Discount</td>
           <td className="text-right py-6 font-bold text-2xl text-emerald-700">
-            {formatCurrency(isDiscountAllowed && isDiscountValid ? finalTotalAfterDiscount : safeCalculation.totalCost)}
+            {formatCurrency(shouldApplyDiscount ? finalTotalAfterDiscount : totalCost)}
           </td>
         </tr>
-        {isDiscountAllowed && !isDiscountValid && clientInfo.discount && clientInfo.discount > 0 && (
+        {!shouldApplyDiscount && (clientInfo.discount ?? storedDiscountPercent ?? 0) > 0 && (
+          <tr>
+            <td colSpan={2} className="py-3 text-center text-sm text-amber-600">
+              Discount entered in Configure session did not apply because the project total is below $2,500 or exceeds the 10% cap.
+            </td>
+          </tr>
+        )}
+        {isDiscountAllowed && hasValidDiscount && !isDiscountValid && (
           <tr className="border-b border-red-200 bg-red-50">
             <td colSpan={2} className="py-3 text-center">
               <p className="text-sm text-red-600 font-medium">
@@ -2739,84 +3109,6 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
                 )}
             </div>
 
-            {/* Discount Field */}
-            <div className="group">
-              <label className="flex items-center gap-3 text-sm font-semibold text-gray-800 mb-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                  <Percent className="w-4 h-4 text-white" />
-                </div>
-                Discount (%)
-              </label>
-              <input
-                type="number"
-                min={0}
-                max={maxAllowedDiscount}
-                step={0.01}
-                value={clientInfo.discount ?? ''}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  const discountValue = value === '' ? undefined : Number(value);
-                  
-                  // Check if discount is not allowed (total cost below $2500)
-                  if (!isDiscountAllowed && discountValue && discountValue > 0) {
-                    alert("Discount is available only for projects above $2,500");
-                    setClientInfo({ ...clientInfo, discount: undefined });
-                    return;
-                  }
-                  
-                  // Check if user is trying to enter more than 10%
-                  if (discountValue && discountValue > 10) {
-                    alert("Discount cannot be applied more than 10%");
-                    // Reset to 10% if they try to exceed
-                    setClientInfo({ ...clientInfo, discount: 10 });
-                    return;
-                  }
-                  
-                  // Check if discount would bring total below $2500
-                  if (discountValue && discountValue > 0) {
-                    const testFinalTotal = (calculation?.totalCost ?? safeCalculation.totalCost) * (1 - (discountValue / 100));
-                    if (testFinalTotal < 2500) {
-                      alert(`Discount cannot be applied. Final total would be $${testFinalTotal.toFixed(2)}, which is below the minimum of $2,500. Maximum allowed discount: ${maxAllowedDiscount}%`);
-                      // Reset to maximum allowed discount
-                      setClientInfo({ ...clientInfo, discount: maxAllowedDiscount });
-                      return;
-                    }
-                  }
-                  
-                  // Ensure discount doesn't exceed maximum allowed
-                  const validDiscount = discountValue ? Math.min(discountValue, maxAllowedDiscount) : undefined;
-                  setClientInfo({ ...clientInfo, discount: validDiscount });
-                }}
-                disabled={!isDiscountAllowed}
-                className={`w-full px-5 py-4 border-2 rounded-xl focus:ring-4 transition-all duration-300 bg-white/80 backdrop-blur-sm text-lg font-medium ${
-                  !isDiscountAllowed 
-                    ? 'border-gray-200 cursor-not-allowed bg-gray-100' 
-                    : !isDiscountValid 
-                      ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500' 
-                      : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500 hover:border-blue-300'
-                }`}
-                placeholder={`Enter discount percentage (max 10%)`}
-              />
-              {!isDiscountAllowed && (
-                <p className="text-sm text-gray-500 mt-2">Discount is available only for projects above $2,500.</p>
-              )}
-              {isDiscountAllowed && !isDiscountValid && clientInfo.discount && clientInfo.discount > 0 && (
-                <p className="text-sm text-red-600 mt-2 flex items-center gap-1">
-                  <Info className="w-4 h-4" />
-                  Discount too high! Final total must remain above $2,500. Maximum allowed: {maxAllowedDiscount}%
-                </p>
-              )}
-              {isDiscountAllowed && isDiscountValid && maxAllowedDiscount > 0 && (
-                <p className="text-sm text-green-600 mt-2">
-                  Maximum discount allowed: {maxAllowedDiscount}% (capped at 10% and keeps total above $2,500)
-                </p>
-              )}
-              {isDiscountAllowed && maxAllowedDiscount === 0 && (
-                <p className="text-sm text-orange-600 mt-2">
-                  No discount available: Project total is too close to $2,500 minimum
-                </p>
-              )}
-            </div>
 
             <button
               type="submit"
@@ -3184,6 +3476,27 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                       📥 Download Agreement
+                    </button>
+                    <button
+                      onClick={handleEmailAgreement}
+                      disabled={isEmailingAgreement}
+                      className={`flex items-center gap-3 px-10 py-5 rounded-2xl transition-all duration-200 font-bold text-xl shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 ${
+                        isEmailingAgreement
+                          ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800'
+                      }`}
+                    >
+                      {isEmailingAgreement ? (
+                        <>
+                          <div className="w-7 h-7 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="w-7 h-7" />
+                          📧 Send to Client
+                        </>
+                      )}
                     </button>
                     {showInlinePreview ? (
                       <button

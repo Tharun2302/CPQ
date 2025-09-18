@@ -77,6 +77,7 @@ export interface Quote {
     isDefault: boolean;
   };
   dealData?: DealData | null;
+  discount?: number;
 }
 
 export interface User {

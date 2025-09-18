@@ -34,6 +34,8 @@ export interface DocxTemplateData {
   '{{discount}}'?: string;
   '{{discount_percent}}'?: string;
   '{{discount_amount}}'?: string;
+  // New: total after discount alias used in template as total_price_discount
+  '{{total_price_discount}}'?: string;
   '{{total_after_discount}}'?: string;
   '{{final_total}}'?: string;
   
@@ -651,8 +653,10 @@ export class DocxTemplateProcessor {
       '{{discount}}': (data as any)['{{discount}}'] || '0',
       '{{discount_percent}}': (data as any)['{{discount_percent}}'] || '0',
       '{{discount_amount}}': (data as any)['{{discount_amount}}'] || '$0.00',
-      '{{total_after_discount}}': (data as any)['{{total_after_discount}}'] || (data as any)['{{total_price}}'] || '$0.00',
-      '{{final_total}}': (data as any)['{{final_total}}'] || (data as any)['{{total_after_discount}}'] || (data as any)['{{total_price}}'] || '$0.00',
+      // Support both names: total_after_discount and total_price_discount
+      '{{total_after_discount}}': (data as any)['{{total_after_discount}}'] || (data as any)['{{total_price_discount}}'] || (data as any)['{{total_price}}'] || '$0.00',
+      '{{total_price_discount}}': (data as any)['{{total_price_discount}}'] || (data as any)['{{total_after_discount}}'] || (data as any)['{{total_price}}'] || '$0.00',
+      '{{final_total}}': (data as any)['{{final_total}}'] || (data as any)['{{total_after_discount}}'] || (data as any)['{{total_price_discount}}'] || (data as any)['{{total_price}}'] || '$0.00',
       
       // Legacy support (for backward compatibility)
       company: companyName,

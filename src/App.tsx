@@ -1073,8 +1073,65 @@ function App() {
     setShowPricing(true);
   };
 
+  // Auto-select a template based on chosen tier and configuration
+  const autoSelectTemplateForPlan = (tierName: string, config?: ConfigurationData): any | null => {
+    if (!templates || templates.length === 0) return null;
+
+    const safeTier = (tierName || '').toLowerCase();
+    const migration = (config?.migrationType || '').toLowerCase();
+
+    const scoreTemplate = (t: any): number => {
+      const name = (t?.name || '').toLowerCase();
+      const desc = (t?.description || '').toLowerCase();
+      let score = 0;
+      // Strong matches on tier keywords
+      if (safeTier && (name.includes(safeTier) || desc.includes(safeTier))) score += 5;
+      if (safeTier.includes('basic') && (name.includes('basic') || desc.includes('basic'))) score += 4;
+      if (safeTier.includes('advanced') && (name.includes('advanced') || desc.includes('advanced'))) score += 4;
+      // Migration type match
+      if (migration && (name.includes(migration) || desc.includes(migration))) score += 3;
+      // Common messaging combos (Slack → Teams etc.)
+      if ((name.includes('slack') && name.includes('teams')) || (desc.includes('slack') && desc.includes('teams'))) score += 2;
+      // Prefer DOCX based templates if available
+      const fileType = t?.wordFile?.type || t?.file?.type || '';
+      if (typeof fileType === 'string' && fileType.includes('wordprocessingml')) score += 1;
+      // Default flag
+      if (t?.isDefault) score += 1;
+      return score;
+    };
+
+    // Compute best template
+    let best: any | null = null;
+    let bestScore = -1;
+    for (const t of templates) {
+      const s = scoreTemplate(t);
+      if (s > bestScore) {
+        best = t;
+        bestScore = s;
+      }
+    }
+    return best;
+  };
+
   const handleSelectTier = (calculation: PricingCalculation) => {
     setSelectedTier(calculation);
+
+    // Attempt to auto-select a template matching the chosen plan
+    try {
+      const auto = autoSelectTemplateForPlan(calculation?.tier?.name || '');
+      if (auto) {
+        setSelectedTemplate(auto);
+        console.log('✅ Auto-selected template for plan:', {
+          plan: calculation?.tier?.name,
+          template: { id: auto.id, name: auto.name }
+        });
+      } else {
+        console.log('⚠️ No matching template found for plan, keeping current selection.');
+      }
+    } catch (e) {
+      console.warn('Auto-select template failed:', e);
+    }
+
     setActiveTab('quote');
   };
 

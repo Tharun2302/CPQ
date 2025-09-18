@@ -1287,6 +1287,124 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Email sending endpoint (supports attachments e.g., DOCX/PDF)
+app.post('/api/email/send', upload.single('attachment'), async (req, res) => {
+  try {
+    console.log('📧 Email send request received');
+    console.log('📧 Email configured:', isEmailConfigured);
+    console.log('📧 EMAIL_USER:', EMAIL_USER ? 'Set' : 'Not set');
+    console.log('📧 EMAIL_PASS:', EMAIL_PASS ? 'Set' : 'Not set');
+    
+    if (!isEmailConfigured) {
+      console.log('❌ Email not configured - missing credentials');
+      return res.status(500).json({
+        success: false,
+        message: 'Email configuration not set. Set EMAIL_USER and EMAIL_PASS in environment.',
+        instructions: [
+          '1. Create .env file in project root',
+          '2. Add: EMAIL_USER=your-gmail@gmail.com',
+          '3. Add: EMAIL_PASS=your-gmail-app-password',
+          '4. Restart the server'
+        ]
+      });
+    }
+
+    const to = req.body?.to;
+    const subject = req.body?.subject;
+    const message = req.body?.message;
+
+    if (!to || !subject || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: to, subject, message'
+      });
+    }
+
+    const mailOptions = {
+      from: EMAIL_USER,
+      to,
+      subject,
+      html: String(message).replace(/\n/g, '<br>'),
+      attachments: []
+    };
+
+    if (req.file) {
+      mailOptions.attachments.push({
+        filename: req.file.originalname || 'attachment',
+        content: req.file.buffer,
+        contentType: req.file.mimetype || 'application/octet-stream'
+      });
+    }
+
+    console.log('📧 Attempting to send email...');
+    console.log('📧 To:', to);
+    console.log('📧 Subject:', subject);
+    console.log('📧 Attachment:', req.file ? req.file.originalname : 'None');
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Email sent successfully:', info.messageId);
+    return res.json({ success: true, messageId: info.messageId });
+  } catch (error) {
+    console.error('❌ Email send error:', error);
+    console.error('❌ Error code:', error.code);
+    console.error('❌ Error response:', error.response);
+    
+    let userFriendlyMessage = 'Failed to send email';
+    
+    if (error.code === 'EAUTH' || error.responseCode === 535) {
+      userFriendlyMessage = 'Gmail authentication failed. Please check your email credentials and App Password.';
+    } else if (error.code === 'ECONNECTION' || error.code === 'ETIMEDOUT') {
+      userFriendlyMessage = 'Could not connect to Gmail servers. Please check your internet connection.';
+    } else if (error.message?.includes('Invalid login')) {
+      userFriendlyMessage = 'Invalid Gmail credentials. Please verify your email and App Password.';
+    }
+    
+    return res.status(500).json({ 
+      success: false, 
+      message: userFriendlyMessage, 
+      error: error.message,
+      code: error.code 
+    });
+  }
+});
+
+// Simple email test endpoint (no attachment)
+app.post('/api/email/test', async (req, res) => {
+  try {
+    if (!isEmailConfigured) {
+      return res.status(500).json({
+        success: false,
+        message: 'Email not configured. Check EMAIL_USER and EMAIL_PASS in .env file.'
+      });
+    }
+    
+    const testEmail = {
+      from: EMAIL_USER,
+      to: EMAIL_USER, // Send to self for testing
+      subject: 'CPQ Email Test',
+      html: 'This is a test email from CPQ system. If you receive this, email is working correctly!'
+    };
+    
+    console.log('📧 Testing email configuration...');
+    const info = await transporter.sendMail(testEmail);
+    
+    return res.json({
+      success: true,
+      message: 'Test email sent successfully!',
+      messageId: info.messageId,
+      sentTo: EMAIL_USER
+    });
+  } catch (error) {
+    console.error('❌ Email test failed:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Email test failed',
+      error: error.message,
+      code: error.code
+    });
+  }
+});
+
 // Serve the React app for the Microsoft callback (SPA handles the code)
 app.get('/auth/microsoft/callback', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
