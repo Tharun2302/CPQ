@@ -1,5 +1,6 @@
 import React from 'react';
-import { Calculator, FileText, Settings, BarChart3, Sparkles, DollarSign, MessageSquare, Upload, Building } from 'lucide-react';
+import { Calculator, FileText, Settings, Sparkles, DollarSign, Upload, Building, ShieldCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import UserMenu from './auth/UserMenu';
 
@@ -62,6 +63,15 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
                     </button>
                   );
                 })}
+
+                {/* Link to Send Agreement page */}
+                <Link
+                  to="/send-agreement-to-stakeholders"
+                  className="flex items-center gap-3 px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 text-gray-700 hover:text-gray-900 hover:bg-white/60 hover:shadow-md"
+                >
+                  <ShieldCheck className="w-5 h-5" />
+                  <span className="font-semibold">Approvals</span>
+                </Link>
               </div>
             )}
             

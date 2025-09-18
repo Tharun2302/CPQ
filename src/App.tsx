@@ -23,6 +23,7 @@ import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
 import MicrosoftCallback from './pages/MicrosoftCallback';
 import DebugEnv from './pages/DebugEnv';
+import SendAgreementToStakeholders from './pages/SendAgreementToStakeholders';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 function App() {
@@ -1482,6 +1483,17 @@ function App() {
           <Route path="/auth/microsoft/callback" element={<MicrosoftCallback />} />
           <Route path="/auth/microsoft/callback/" element={<MicrosoftCallback />} />
           <Route path="/debug-env" element={<DebugEnv />} />
+          
+          {/* Protected Route - Send Agreement to Stakeholders */}
+          <Route path="/send-agreement-to-stakeholders" element={
+            <ProtectedRoute>
+              <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/50 to-indigo-100/50">
+                <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+                  <SendAgreementToStakeholders />
+                </main>
+              </div>
+            </ProtectedRoute>
+          } />
           
           {/* Protected Routes - Original CPQ App */}
           <Route path="/dashboard" element={

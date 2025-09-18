@@ -101,10 +101,11 @@ let databaseAvailable = false;
 
 // Environment variables
 const HUBSPOT_API_KEY = process.env.HUBSPOT_API_KEY || 'demo-key';
-const EMAIL_USER = process.env.EMAIL_USER;
-const EMAIL_PASS = process.env.EMAIL_PASS;
-const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
-const EMAIL_PORT = process.env.EMAIL_PORT || 587;
+// Support multiple env var names (Gmail or generic)
+const EMAIL_USER = process.env.EMAIL_USER || process.env.SMTP_USER || process.env.GMAIL_EMAIL;
+const EMAIL_PASS = process.env.EMAIL_PASS || process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
+const EMAIL_HOST = process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com';
+const EMAIL_PORT = process.env.EMAIL_PORT || process.env.SMTP_PORT || 587;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
 
 // Email configuration
@@ -112,16 +113,93 @@ let transporter;
 const isEmailConfigured = EMAIL_USER && EMAIL_PASS;
 
 if (isEmailConfigured) {
+  const numericPort = Number(EMAIL_PORT) || 587;
+  const useSecure = numericPort === 465; // Gmail SSL port
   transporter = nodemailer.createTransport({
     host: EMAIL_HOST,
-    port: EMAIL_PORT,
-    secure: false,
-  auth: {
+    port: numericPort,
+    secure: useSecure,
+    auth: {
       user: EMAIL_USER,
       pass: EMAIL_PASS
     }
   });
 }
+
+// Minimal email endpoints (only when email is configured)
+app.post('/api/email/send-immediate', async (req, res) => {
+  try {
+    if (!isEmailConfigured) {
+      return res.status(500).json({ success: false, message: 'Email not configured' });
+    }
+    const { to, subject, message } = req.body || {};
+    if (!to || !subject || !message) {
+      return res.status(400).json({ success: false, message: 'Missing to, subject, or message' });
+    }
+    const info = await transporter.sendMail({ from: EMAIL_USER, to, subject, html: (message || '').replace(/\n/g, '<br>') });
+    res.json({ success: true, messageId: info.messageId });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.post('/api/email/send-simple', async (req, res) => {
+  try {
+    if (!isEmailConfigured) {
+      return res.status(500).json({ success: false, message: 'Email not configured' });
+    }
+    const { to, subject, message } = req.body || {};
+    if (!to || !subject || !message) {
+      return res.status(400).json({ success: false, message: 'Missing to, subject, or message' });
+    }
+    const info = await transporter.sendMail({ from: EMAIL_USER, to, subject, html: (message || '').replace(/\n/g, '<br>') });
+    res.json({ success: true, messageId: info.messageId });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Email health/verification endpoint
+app.get('/api/email/health', async (_req, res) => {
+  try {
+    if (!EMAIL_USER || !EMAIL_PASS) {
+      return res.status(200).json({
+        success: false,
+        configured: false,
+        canSend: false,
+        message: 'Email credentials not provided in environment variables',
+        expectedEnv: ['GMAIL_EMAIL or SMTP_USER or EMAIL_USER', 'GMAIL_APP_PASSWORD or SMTP_PASS or EMAIL_PASS']
+      });
+    }
+    if (!transporter) {
+      return res.status(200).json({
+        success: false,
+        configured: true,
+        canSend: false,
+        message: 'Transporter not initialized'
+      });
+    }
+
+    // Verify connection configuration with SMTP server
+    await transporter.verify();
+    return res.json({
+      success: true,
+      configured: true,
+      canSend: true,
+      user: EMAIL_USER.replace(/(.{2}).+(@.*)/, '$1***$2'),
+      host: EMAIL_HOST,
+      port: EMAIL_PORT
+    });
+  } catch (error) {
+    return res.status(200).json({
+      success: false,
+      configured: true,
+      canSend: false,
+      message: error.message,
+      code: error.code
+    });
+  }
+});
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'dist')));
@@ -1285,6 +1363,65 @@ app.get('/api/health', (req, res) => {
     email: isEmailConfigured ? 'Configured' : 'Not configured',
     hubspot: HUBSPOT_API_KEY !== 'demo-key' ? 'Configured' : 'Demo mode'
   });
+});
+
+// Microsoft OAuth: server-side token exchange (avoids browser CORS)
+app.post('/api/auth/microsoft/exchange', async (req, res) => {
+  try {
+    const { code, codeVerifier, redirectUri, clientId } = req.body || {};
+    if (!code || !codeVerifier || !redirectUri || !clientId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: code, codeVerifier, redirectUri, clientId'
+      });
+    }
+
+    const tokenUrl = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
+    const params = new URLSearchParams({
+      client_id: clientId,
+      scope: 'openid profile email offline_access https://graph.microsoft.com/User.Read',
+      code,
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code',
+      code_verifier: codeVerifier
+    });
+
+    const tokenResp = await axios.post(tokenUrl, params.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      timeout: 15000
+    });
+
+    const accessToken = tokenResp.data?.access_token;
+    if (!accessToken) {
+      return res.status(500).json({ success: false, message: 'No access token in response' });
+    }
+
+    // Fetch profile from Microsoft Graph
+    const meResp = await axios.get('https://graph.microsoft.com/v1.0/me', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      timeout: 15000
+    });
+
+    const profile = meResp.data || {};
+    const userData = {
+      id: profile.id || `microsoft_${Date.now()}`,
+      name: profile.displayName || [profile.givenName, profile.surname].filter(Boolean).join(' ') || 'Microsoft User',
+      email: profile.mail || profile.userPrincipalName || 'user@microsoft.com',
+      accessToken,
+      provider: 'microsoft',
+      createdAt: new Date().toISOString()
+    };
+
+    return res.json({ success: true, user: userData });
+  } catch (error) {
+    const status = error.response?.status || 500;
+    const data = error.response?.data;
+    return res.status(status).json({
+      success: false,
+      message: error.message,
+      details: data
+    });
+  }
 });
 
 // Serve the React app for the Microsoft callback (SPA handles the code)

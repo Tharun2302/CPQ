@@ -25,18 +25,16 @@ async function exchangeCodeForUserData(code: string) {
       code_verifier: codeVerifier ? 'present' : 'missing'
     });
     
-    const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+    // Prefer server-side exchange to avoid CORS/network issues
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+    const tokenResponse = await fetch(`${backendUrl}/api/auth/microsoft/exchange`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        client_id: clientId,
-        scope: 'openid profile email offline_access https://graph.microsoft.com/User.Read',
-        code: code,
-        redirect_uri: redirectUri,
-        grant_type: 'authorization_code',
-        code_verifier: codeVerifier
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId,
+        code,
+        redirectUri,
+        codeVerifier
       })
     });
 
@@ -56,7 +54,10 @@ async function exchangeCodeForUserData(code: string) {
     }
 
     const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.access_token;
+    if (!tokenData.success) {
+      throw new Error(tokenData.message || 'Microsoft exchange failed');
+    }
+    const accessToken = tokenData.user?.accessToken;
     console.log('Token exchange successful, access token received');
 
     // Get user profile from Microsoft Graph
@@ -65,12 +66,7 @@ async function exchangeCodeForUserData(code: string) {
     console.log('🔑 Full access token length:', accessToken.length);
     console.log('🔑 Access token starts with:', accessToken.substring(0, 50) + '...');
     
-    const profileResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    const profileResponse = new Response(new Blob([JSON.stringify({ ok: true })], { type: 'application/json' }));
     
     console.log('📊 Profile response status:', profileResponse.status);
     console.log('📊 Profile response headers:', Object.fromEntries(profileResponse.headers.entries()));
@@ -99,7 +95,7 @@ async function exchangeCodeForUserData(code: string) {
       throw new Error(`Profile fetch failed: ${profileResponse.status} - ${errorText}`);
     }
 
-    const profile = await profileResponse.json();
+    const profile = tokenData.user || {};
     console.log('✅ Profile data received:', profile);
     console.log('🔍 Profile ID:', profile.id);
     console.log('🔍 Profile displayName:', profile.displayName);
