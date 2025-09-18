@@ -1026,6 +1026,36 @@ function App() {
     }
   }, [quotes]);
 
+  // Sync activeTab with URL (?tab=...) so Back button navigates between tabs
+  useEffect(() => {
+    const syncFromUrl = () => {
+      if (window.location.pathname.startsWith('/dashboard')) {
+        const params = new URLSearchParams(window.location.search);
+        const tabFromUrl = params.get('tab') || 'deal';
+        // Always set from URL to avoid stale state comparison issues
+        setActiveTab(tabFromUrl);
+      }
+    };
+
+    // Initial sync
+    syncFromUrl();
+    // Handle browser back/forward
+    window.addEventListener('popstate', syncFromUrl);
+    return () => window.removeEventListener('popstate', syncFromUrl);
+  }, []);
+
+  // Whenever activeTab changes inside dashboard, push it to URL
+  useEffect(() => {
+    if (window.location.pathname.startsWith('/dashboard')) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('tab') !== activeTab) {
+        params.set('tab', activeTab);
+        const newUrl = `${window.location.pathname}?${params.toString()}`;
+        window.history.pushState({}, '', newUrl);
+      }
+    }
+  }, [activeTab]);
+
   // Reset configure session when returning to configure tab
   useEffect(() => {
     if (activeTab === 'configure') {
@@ -1260,6 +1290,22 @@ function App() {
     setSelectedTemplate(template);
   };
 
+  const handleTabChange = (tabName: string) => {
+    setActiveTab(tabName);
+    try {
+      const params = new URLSearchParams(window.location.search);
+      params.set('tab', tabName);
+      const target = `/dashboard?${params.toString()}`;
+      if (window.location.pathname.startsWith('/dashboard')) {
+        window.history.pushState({}, '', target);
+      } else {
+        window.location.href = target;
+      }
+    } catch (e) {
+      // no-op if history not available
+    }
+  };
+
   const renderContent = () => {
     // Handle signature form display
     if (isSignatureForm && signatureFormData) {
@@ -1487,7 +1533,7 @@ function App() {
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/50 to-indigo-100/50">
-                {!isSignatureForm && <Navigation activeTab={activeTab} onTabChange={setActiveTab} />}
+                {!isSignatureForm && <Navigation activeTab={activeTab} onTabChange={handleTabChange} />}
                 
                 <main className={`${isSignatureForm ? 'max-w-6xl' : 'max-w-7xl'} mx-auto px-4 sm:px-6 lg:px-8 py-10`}>
                   {renderContent()}
