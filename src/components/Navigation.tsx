@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calculator, FileText, Settings, BarChart3, Sparkles, DollarSign, MessageSquare, Upload, Building } from 'lucide-react';
+import { Calculator, FileText, Settings, BarChart3, Sparkles, MessageSquare, Upload, Building } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import UserMenu from './auth/UserMenu';
 
@@ -14,9 +14,8 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
   const tabs = [
     { id: 'deal', label: 'Deal', icon: Building },
     { id: 'configure', label: 'Configure', icon: Calculator },
-    { id: 'pricing-config', label: 'Pricing', icon: DollarSign },
     { id: 'quote', label: 'Quote', icon: FileText },
-    { id: 'quotes', label: 'Quotes', icon: FileText },
+    { id: 'quotes', label: 'Documents', icon: FileText },
     { id: 'templates', label: 'Templates', icon: Upload },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];

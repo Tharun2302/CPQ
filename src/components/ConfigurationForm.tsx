@@ -54,7 +54,8 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
     numberOfInstances: 0,
     duration: 0,
     migrationType: '' as any, // Start with empty to hide other fields
-    dataSizeGB: 0
+    dataSizeGB: 0,
+    discount: 0
   });
 
   // Contact information state
@@ -65,8 +66,9 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
     companyName2: ''
   });
 
-  // Discount state for proper display
-  const [discountValue, setDiscountValue] = useState<string>('');
+  // Toggle to show/hide discount input inside Project Configuration
+  const [showDiscount, setShowDiscount] = useState<boolean>(false);
+
 
   // Initialize contact info from deal data
   useEffect(() => {
@@ -543,6 +545,47 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
                     />
                   </div>
                 )}
+
+                {/* Discount toggle and input (inside Project Configuration) */}
+                <div className="group md:col-span-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="flex items-center gap-3 text-sm font-semibold text-gray-800">
+                      <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-600 rounded-lg flex items-center justify-center">
+                        <Percent className="w-4 h-4 text-white" />
+                      </div>
+                      Discount (%)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowDiscount(v => !v)}
+                      className="px-3 py-2 text-sm font-semibold rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
+                    >
+                      {showDiscount ? 'Hide' : 'Add'} Discount
+                    </button>
+                  </div>
+                  {showDiscount && (
+                    <div className="bg-white/70 border border-gray-200 rounded-2xl p-6">
+                      <input
+                        type="number"
+                        min={0}
+                        max={10}
+                        step={0.01}
+                        value={config.discount || ''}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (raw === '') { handleChange('discount', 0); return; }
+                          const numValue = Number(raw);
+                          if (numValue > 10) { alert('Discount cannot be more than 10%'); return; }
+                          if (numValue < 0) { handleChange('discount', 0); return; }
+                          handleChange('discount', numValue);
+                        }}
+                        className="w-full px-5 py-4 border-2 rounded-xl focus:ring-4 transition-all duration-300 bg-white/80 backdrop-blur-sm text-lg font-medium border-gray-200 focus:ring-blue-500/20 focus:border-blue-500 hover:border-blue-300"
+                        placeholder={`Enter discount percentage (max 10%)`}
+                      />
+                      <p className="text-xs text-gray-500 mt-2">Discount is available only for projects above $2,500 and capped at 10%.</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -561,66 +604,6 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
                   <Sparkles className="w-5 h-5" />
                 </span>
               </button>
-
-              {/* Discount Field moved from Quote session */}
-              <div className="mt-6 bg-white/70 border border-gray-200 rounded-2xl p-6">
-                <label className="flex items-center gap-3 text-sm font-semibold text-gray-800 mb-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-600 rounded-lg flex items-center justify-center">
-                    <Percent className="w-4 h-4 text-white" />
-                  </div>
-                  Discount (%)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={10}
-                  step={0.01}
-                  value={discountValue}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    
-                    // Allow empty value for clearing
-                    if (raw === '') {
-                      setDiscountValue('');
-                      try { 
-                        localStorage.setItem('cpq_discount', '');
-                        window.dispatchEvent(new CustomEvent('discountUpdated'));
-                      } catch {}
-                      return;
-                    }
-                    
-                    const numValue = Number(raw);
-                    
-                    // Check if value exceeds 10%
-                    if (numValue > 10) {
-                      alert('Discount cannot be more than 10%');
-                      return; // Don't update the value
-                    }
-                    
-                    // Ensure value is not negative
-                    if (numValue < 0) {
-                      setDiscountValue('0');
-                      try { 
-                        localStorage.setItem('cpq_discount', '0');
-                        window.dispatchEvent(new CustomEvent('discountUpdated'));
-                      } catch {}
-                      return;
-                    }
-                    
-                    // Update the display value immediately
-                    setDiscountValue(raw);
-                    
-                    // Save to localStorage and notify other components
-                    try { 
-                      localStorage.setItem('cpq_discount', raw);
-                      window.dispatchEvent(new CustomEvent('discountUpdated'));
-                    } catch {}
-                  }}
-                  className="w-full px-5 py-4 border-2 rounded-xl focus:ring-4 transition-all duration-300 bg-white/80 backdrop-blur-sm text-lg font-medium border-gray-200 focus:ring-blue-500/20 focus:border-blue-500 hover:border-blue-300"
-                  placeholder={`Enter discount percentage (max 10%)`}
-                />
-                <p className="text-xs text-gray-500 mt-2">Discount is available only for projects above $2,500 and capped at 10%.</p>
-              </div>
             </>
           )}
         </form>
