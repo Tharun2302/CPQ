@@ -6,6 +6,7 @@ import {
   Calendar, 
   Target, 
   UserCheck,
+  ExternalLink,
   RefreshCw,
   AlertCircle,
   CheckCircle,
@@ -124,6 +125,15 @@ const DealDetails: React.FC<DealDetailsProps> = ({ dealData, onRefresh, onUseDea
             <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
+          <a
+            href={`https://app.hubspot.com/contacts/_/deal/${dealData.dealId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <ExternalLink className="w-4 h-4 mr-2" />
+            View in HubSpot
+          </a>
         </div>
       </div>
 

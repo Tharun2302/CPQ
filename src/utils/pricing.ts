@@ -163,26 +163,13 @@ export function calculatePricing(config: ConfigurationData, tier: PricingTier): 
     const migrationCost = Math.max(floor, s38);
  
     const totalCost = userCost + dataCost + instanceCost + migrationCost;
-    
-    // Apply discount if provided and conditions are met
-    let discountAmount = 0;
-    let finalTotal = totalCost;
-    
-    if (config.discount && config.discount > 0 && totalCost >= 2500) {
-      // Discount is only available for projects above $2,500 and capped at 10%
-      const maxDiscount = Math.min(config.discount, 10);
-      discountAmount = (totalCost * maxDiscount) / 100;
-      finalTotal = totalCost - discountAmount;
-    }
-
+ 
     return {
       userCost,
       dataCost,
       migrationCost,
       instanceCost,
       totalCost,
-      discountAmount,
-      finalTotal,
       tier
     };
   }
@@ -200,19 +187,8 @@ export function calculatePricing(config: ConfigurationData, tier: PricingTier): 
   const migrationCost = fallbackPricing.migrationCost;
   const instanceCost = getInstanceCost(config.instanceType, config.duration) * config.numberOfInstances;
   const totalCost = userCost + dataCost + migrationCost + instanceCost;
-  
-  // Apply discount if provided and conditions are met
-  let discountAmount = 0;
-  let finalTotal = totalCost;
-  
-  if (config.discount && config.discount > 0 && totalCost >= 2500) {
-    // Discount is only available for projects above $2,500 and capped at 10%
-    const maxDiscount = Math.min(config.discount, 10);
-    discountAmount = (totalCost * maxDiscount) / 100;
-    finalTotal = totalCost - discountAmount;
-  }
-
-  return { userCost, dataCost, migrationCost, instanceCost, totalCost, discountAmount, finalTotal, tier };
+ 
+  return { userCost, dataCost, migrationCost, instanceCost, totalCost, tier };
 }
  
 export function calculateAllTiers(config: ConfigurationData, tiers: PricingTier[] = PRICING_TIERS): PricingCalculation[] {

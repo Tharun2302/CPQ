@@ -10,7 +10,7 @@
     <div id="status">Testing...</div>
     
     <script>
-        // ver is running on port 5175
+        // Test if the dev server is running on port 5175
         fetch('http://localhost:5175/')
             .then(response => {
                 document.getElementById('status').innerHTML = '✅ Server responding on port 5175';

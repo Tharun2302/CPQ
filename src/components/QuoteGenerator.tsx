@@ -199,20 +199,23 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
       return undefined;
     }
   })();
-  // Calculate discount percentage from the calculation object
-  const discountPercent = calculation?.discountAmount && calculation?.totalCost 
-    ? Math.round((calculation.discountAmount / calculation.totalCost) * 100) 
-    : (clientInfo.discount ?? storedDiscountPercent ?? 0);
+  const discountPercent = (clientInfo.discount ?? storedDiscountPercent ?? 0);
   
   // Allow discount only when total project cost exceeds $2500
   const isDiscountAllowed = totalCost >= 2500;
   
-  // Use the already calculated discount values from the calculation object
-  const discountAmount = calculation?.discountAmount ?? 0;
-  const finalTotalAfterDiscount = calculation?.finalTotal ?? totalCost;
+  // Check if user has entered a valid discount
+  const hasValidDiscount = discountPercent > 0 && discountPercent <= 10;
   
-  // Check if discount should be applied based on calculation object
-  const shouldApplyDiscount = discountAmount > 0 && finalTotalAfterDiscount < totalCost;
+  // Calculate final total after discount
+  const discountAmount = hasValidDiscount ? totalCost * (discountPercent / 100) : 0;
+  const finalTotalAfterDiscount = totalCost - discountAmount;
+  
+  // Check if discount would bring total below $2500 - if so, don't apply
+  const isDiscountValid = hasValidDiscount ? finalTotalAfterDiscount >= 2500 : true;
+  
+  // Should we show and apply the discount?
+  const shouldApplyDiscount = isDiscountAllowed && hasValidDiscount && isDiscountValid;
   
   
 
@@ -2787,31 +2790,7 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
     );
   }
 
-  const QuotePreview = ({ 
-    dealData, 
-    clientInfo, 
-    calculation, 
-    safeCalculation, 
-    discountPercent, 
-    shouldApplyDiscount, 
-    discountAmount, 
-    finalTotalAfterDiscount, 
-    totalCost, 
-    quoteId, 
-    generateUniqueQuoteId 
-  }: { 
-    dealData?: any;
-    clientInfo: ClientInfo;
-    calculation: any;
-    safeCalculation: any;
-    discountPercent: number;
-    shouldApplyDiscount: boolean;
-    discountAmount: number;
-    finalTotalAfterDiscount: number;
-    totalCost: number;
-    quoteId: string;
-    generateUniqueQuoteId: () => string;
-  }) => {
+  const QuotePreview = ({ dealData }: { dealData?: any }) => {
     // Debug the discount values in QuotePreview
     console.log('🔍 QuotePreview render with discount values:', {
       clientInfoDiscount: clientInfo.discount,
@@ -2970,7 +2949,15 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
             </td>
           </tr>
         )}
-        {/* Note: legacy validation block removed after discount refactor */}
+        {isDiscountAllowed && hasValidDiscount && !isDiscountValid && (
+          <tr className="border-b border-red-200 bg-red-50">
+            <td colSpan={2} className="py-3 text-center">
+              <p className="text-sm text-red-600 font-medium">
+                ⚠️ Discount not applied: Final total would be below $2,500 minimum
+              </p>
+            </td>
+          </tr>
+        )}
           </tbody>
         </table>
         </div>
@@ -3005,21 +2992,16 @@ ${diagnostic.recommendations.map(rec => `• ${rec}`).join('\n')}
               <Download className="w-4 h-4" />
               Download PDF
             </button>
+            <button 
+              onClick={handleSendQuote}
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 font-semibold flex items-center gap-2 shadow-lg"
+            >
+              <Send className="w-4 h-4" />
+              Generate PDF Quote
+            </button>
           </div>
         </div>
-        <QuotePreview 
-          dealData={dealData}
-          clientInfo={clientInfo}
-          calculation={calculation}
-          safeCalculation={safeCalculation}
-          discountPercent={discountPercent}
-          shouldApplyDiscount={shouldApplyDiscount}
-          discountAmount={discountAmount}
-          finalTotalAfterDiscount={finalTotalAfterDiscount}
-          totalCost={totalCost}
-          quoteId={quoteId}
-          generateUniqueQuoteId={generateUniqueQuoteId}
-        />
+        <QuotePreview dealData={dealData} />
       </div>
     );
   }

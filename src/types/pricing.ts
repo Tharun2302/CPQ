@@ -37,7 +37,6 @@ export interface ConfigurationData {
   duration: number;
   migrationType: 'Messaging';
   dataSizeGB: number;
-  discount?: number;
 }
 
 export interface PricingCalculation {
@@ -46,8 +45,6 @@ export interface PricingCalculation {
   migrationCost: number;
   instanceCost: number;
   totalCost: number;
-  discountAmount?: number;
-  finalTotal?: number;
   tier: PricingTier;
 }
 
