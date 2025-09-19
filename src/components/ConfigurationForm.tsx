@@ -68,6 +68,15 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
   // Discount state for proper display
   const [discountValue, setDiscountValue] = useState<string>('');
 
+  // Combination selection (persisted)
+  const [combination, setCombination] = useState<string>(() => {
+    try {
+      return localStorage.getItem('cpq_combination') || '';
+    } catch {
+      return '';
+    }
+  });
+
   // Initialize contact info from deal data
   useEffect(() => {
     // Load previously saved configuration from localStorage (persistence across sessions)
@@ -364,20 +373,27 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
                   </div>
                   Combination
                 </label>
-                {/* Restrict to SLACK TO TEAMS only */}
+                {/* Dropdown with explicit user selection */}
                 <select
-                  value={'slack-to-teams'}
-                  onChange={() => { try { localStorage.setItem('cpq_combination', 'slack-to-teams'); } catch {} }}
+                  value={combination}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCombination(value);
+                    try { localStorage.setItem('cpq_combination', value); } catch {}
+                  }}
                   className="w-full px-6 py-4 border-2 border-purple-200 rounded-xl focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 bg-white/90 backdrop-blur-sm hover:border-purple-300 text-lg font-medium"
                 >
+                  <option value="">Select Combination</option>
                   <option value="slack-to-teams">SLACK TO TEAMS</option>
                 </select>
-                <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                  <p className="text-sm text-purple-700">
-                    <strong>Selected:</strong> SLACK TO TEAMS
-                    <span className="block mt-1 text-purple-600">Templates for this combination will be auto-selected after you choose a plan.</span>
-                  </p>
-                </div>
+                {combination === 'slack-to-teams' && (
+                  <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <p className="text-sm text-purple-700">
+                      <strong>Selected:</strong> SLACK TO TEAMS
+                      <span className="block mt-1 text-purple-600">Templates for this combination will be auto-selected after you choose a plan.</span>
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
