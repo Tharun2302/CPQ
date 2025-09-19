@@ -70,6 +70,45 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
 
   // Initialize contact info from deal data
   useEffect(() => {
+    // Load previously saved configuration from localStorage (persistence across sessions)
+    try {
+      const savedConfig = localStorage.getItem('cpq_configuration');
+      if (savedConfig) {
+        const parsed = JSON.parse(savedConfig);
+        const merged = {
+          numberOfUsers: typeof parsed.numberOfUsers === 'number' ? parsed.numberOfUsers : 0,
+          instanceType: parsed.instanceType || 'Small',
+          numberOfInstances: typeof parsed.numberOfInstances === 'number' ? parsed.numberOfInstances : 0,
+          duration: typeof parsed.duration === 'number' ? parsed.duration : 0,
+          migrationType: parsed.migrationType || ('' as any),
+          dataSizeGB: typeof parsed.dataSizeGB === 'number' ? parsed.dataSizeGB : 0
+        } as ConfigurationData;
+        setConfig(merged);
+        onConfigurationChange(merged);
+      }
+    } catch {}
+
+    // Load persisted contact info if available (user may have edited manually earlier)
+    try {
+      const savedContact = localStorage.getItem('cpq_contact_info');
+      if (savedContact) {
+        const parsed = JSON.parse(savedContact);
+        setContactInfo({
+          clientName: parsed.clientName || '',
+          clientEmail: parsed.clientEmail || '',
+          company: parsed.company || '',
+          companyName2: parsed.companyName2 || ''
+        });
+        if (onContactInfoChange) {
+          onContactInfoChange({
+            clientName: parsed.clientName || '',
+            clientEmail: parsed.clientEmail || '',
+            company: (parsed.companyName2 || parsed.company || '')
+          });
+        }
+      }
+    } catch {}
+
     if (dealData) {
       const initialContactInfo = {
         clientName: dealData.contactName || '',
@@ -117,6 +156,8 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
     const newConfig = { ...config, [field]: value };
     setConfig(newConfig);
     onConfigurationChange(newConfig);
+    // Persist configuration so values remain when user navigates
+    try { localStorage.setItem('cpq_configuration', JSON.stringify(newConfig)); } catch {}
     
     // Auto-scroll down when migration type is selected, but only if we have a target section
     if (field === 'migrationType' && value) {
@@ -137,6 +178,8 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
     };
     console.log('🔍 ConfigurationForm: Contact info changed:', { field, value, newContactInfo });
     setContactInfo(newContactInfo);
+    // Persist contact info
+    try { localStorage.setItem('cpq_contact_info', JSON.stringify(newContactInfo)); } catch {}
     
     // Notify parent component of contact info changes
     if (onContactInfoChange) {
@@ -333,6 +376,8 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
                       if (onTemplateSelect) {
                         onTemplateSelect(template);
                       }
+                    // Persist selected template for persistence across sessions
+                    try { localStorage.setItem('cpq_selected_template_id', template ? template.id : ''); } catch {}
                       
                       // Auto-scroll to Project Configuration section when template is selected
                       if (template) {

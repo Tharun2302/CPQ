@@ -11,7 +11,8 @@ interface PricingComparisonProps {
 
 const PricingComparison: React.FC<PricingComparisonProps> = ({
   calculations,
-  onSelectTier
+  onSelectTier,
+  configuration
 }) => {
   const [discount, setDiscount] = useState<number>(0);
 
@@ -54,10 +55,16 @@ const PricingComparison: React.FC<PricingComparisonProps> = ({
     };
   }, []);
 
-  // Filter to show only Basic and Advanced plans
-  const filteredCalculations = calculations.filter(calc => 
-    calc.tier.name === 'Basic' || calc.tier.name === 'Advanced'
-  );
+  // Business rule: if users > 25,000 show ONLY the Advanced plan
+  const enforceAdvancedOnly = (configuration?.numberOfUsers || 0) > 25000;
+
+  // Filter plans accordingly
+  const filteredCalculations = calculations.filter(calc => {
+    if (enforceAdvancedOnly) {
+      return calc.tier.name === 'Advanced';
+    }
+    return calc.tier.name === 'Basic' || calc.tier.name === 'Advanced';
+  });
 
   // Helper function to apply discount calculations
   const calculateDiscountedPrice = (totalCost: number) => {
@@ -86,6 +93,8 @@ const PricingComparison: React.FC<PricingComparisonProps> = ({
     };
   };
 
+  const isSingle = filteredCalculations.length === 1;
+
   return (
     <div className="bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 rounded-2xl shadow-2xl border border-slate-200/50 p-8 backdrop-blur-sm">
       <div className="text-center mb-10">
@@ -95,14 +104,14 @@ const PricingComparison: React.FC<PricingComparisonProps> = ({
         <p className="text-gray-600 text-lg">Compare our pricing tiers and find the best fit for your project</p>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+      <div className={`grid grid-cols-1 ${isSingle ? 'md:grid-cols-1 justify-items-center' : 'md:grid-cols-2'} gap-8 max-w-4xl mx-auto`}>
         {filteredCalculations.map((calc) => {
           const discountInfo = calculateDiscountedPrice(calc.totalCost);
           
           return (
             <div
               key={calc.tier.id}
-              className="relative rounded-2xl border-2 border-gray-200 bg-white p-8 transition-all duration-500 hover:shadow-2xl transform hover:-translate-y-2 hover:border-blue-300"
+              className="relative rounded-2xl border-2 border-gray-200 bg-white p-8 transition-all duration-500 hover:shadow-2xl transform hover:-translate-y-2 hover:border-blue-300 w-full max-w-sm"
             >
 
               <div className="text-center mb-6">

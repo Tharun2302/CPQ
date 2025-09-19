@@ -155,6 +155,23 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
     };
   }, []);
 
+  // Persist and restore Quote session client inputs so they remain across navigation
+  useEffect(() => {
+    // Load client info from storage on mount
+    try {
+      const saved = localStorage.getItem('cpq_quote_client_info');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setClientInfo((prev) => ({
+          ...prev,
+          clientName: parsed.clientName || '',
+          clientEmail: parsed.clientEmail || '',
+          company: parsed.company || ''
+        }));
+      }
+    } catch {}
+  }, []);
+
   const [showPreview, setShowPreview] = useState(false);
   
   // Add debugging to track discount changes
@@ -214,6 +231,8 @@ const QuoteGenerator: React.FC<QuoteGeneratorProps> = ({
   const updateClientInfo = (updates: Partial<ClientInfo>) => {
     const newClientInfo = { ...clientInfo, ...updates };
     setClientInfo(newClientInfo);
+    // Persist to localStorage so the Quote session remains sticky
+    try { localStorage.setItem('cpq_quote_client_info', JSON.stringify(newClientInfo)); } catch {}
     
     // Only notify parent when user makes actual changes (not during auto-fill)
     if (onClientInfoChange && (updates.clientName || updates.clientEmail || updates.company || updates.discount !== undefined)) {
