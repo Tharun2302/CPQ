@@ -66,11 +66,19 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
 
                 {/* Link to Send Agreement page */}
                 <Link
-                  to="/send-agreement-to-stakeholders"
+                  to="/approval-workflow"
                   className="flex items-center gap-3 px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 text-gray-700 hover:text-gray-900 hover:bg-white/60 hover:shadow-md"
                 >
                   <ShieldCheck className="w-5 h-5" />
                   <span className="font-semibold">Approvals</span>
+                </Link>
+
+                <Link
+                  to="/send-agreement-to-stakeholders"
+                  className="flex items-center gap-3 px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 text-gray-700 hover:text-gray-900 hover:bg-white/60 hover:shadow-md"
+                >
+                  <FileText className="w-5 h-5" />
+                  <span className="font-semibold">Send Agreement</span>
                 </Link>
               </div>
             )}

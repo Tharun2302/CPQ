@@ -159,6 +159,28 @@ const SendAgreementToStakeholders: React.FC = () => {
       if (!clientResult.success) {
         setSendError(`Approvals started, but failed to notify client: ${clientResult.message || 'Unknown error'}`);
       }
+
+      // Save a workflow record locally so ApprovalWorkflow can display it
+      try {
+        const now = new Date();
+        const displayTime = now.toLocaleDateString('en-GB') + ' ' + now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        const workflowRecord = {
+          id: selectedDocument?.id || `doc-${now.getTime()}`,
+          name: selectedDocument?.name || 'Document',
+          client: selectedDocument?.clientName || 'client',
+          type: (documentType as any) || 'PDF',
+          managerStatus: 'pending',
+          ceoStatus: 'pending',
+          clientStatus: 'pending',
+          createdAt: displayTime
+        } as any;
+        const raw = localStorage.getItem('approval_workflows');
+        const arr = raw ? JSON.parse(raw) : [];
+        arr.unshift(workflowRecord);
+        localStorage.setItem('approval_workflows', JSON.stringify(arr));
+      } catch (_) {
+        // ignore persistence errors
+      }
     } finally {
       setIsSending(false);
     }

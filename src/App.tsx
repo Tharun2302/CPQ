@@ -13,6 +13,7 @@ import DealDetails from './components/DealDetails';
 
 import Settings from './components/Settings';
 import DigitalSignatureForm from './components/DigitalSignatureForm';
+import ApprovalWorkflow from './pages/ApprovalWorkflow';
 import { ConfigurationData, PricingCalculation, PricingTier, Quote } from './types/pricing';
 import { calculateAllTiers, getRecommendedTier, PRICING_TIERS } from './utils/pricing';
 import { FileText } from 'lucide-react';
@@ -1505,6 +1506,13 @@ function App() {
                   {renderContent()}
                 </main>
               </div>
+            </ProtectedRoute>
+          } />
+
+          {/* Protected Route - Approval Workflow */}
+          <Route path="/approval-workflow" element={
+            <ProtectedRoute>
+              <ApprovalWorkflow />
             </ProtectedRoute>
           } />
           

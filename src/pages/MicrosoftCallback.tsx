@@ -27,7 +27,7 @@ async function exchangeCodeForUserData(code: string) {
     
     // Prefer server-side exchange to avoid CORS/network issues
     const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
-    const tokenResponse = await fetch(`${backendUrl}/api/auth/microsoft/exchange`, {
+    let tokenResponse = await fetch(`${backendUrl}/api/auth/microsoft/exchange`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -50,6 +50,56 @@ async function exchangeCodeForUserData(code: string) {
         grant_type: 'authorization_code',
         code_verifier: codeVerifier ? 'present' : 'missing'
       });
+      // If the app is registered as SPA, Microsoft requires client-side redemption
+      // Detect AADSTS9002327 and fall back to client-side PKCE redemption
+      if (errorText.includes('AADSTS9002327')) {
+        console.warn('⚠️ Falling back to client-side code redemption due to SPA app registration (AADSTS9002327)');
+        const tokenUrl = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
+        const params = new URLSearchParams({
+          client_id: clientId,
+          scope: 'openid profile email https://graph.microsoft.com/User.Read',
+          code,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code',
+          code_verifier: codeVerifier
+        });
+        tokenResponse = await fetch(tokenUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: params.toString()
+        });
+        if (!tokenResponse.ok) {
+          const txt = await tokenResponse.text();
+          throw new Error(`Token exchange failed: ${tokenResponse.status} - ${txt}`);
+        }
+        const tokenJson = await tokenResponse.json();
+        const accessToken = tokenJson.access_token as string | undefined;
+        const idToken = tokenJson.id_token as string | undefined;
+        // Decode ID token (JWT) to get user profile
+        const decodeJwt = (jwt: string) => {
+          const base64Url = jwt.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
+          return JSON.parse(atob(padded));
+        };
+        const idPayload: any = idToken ? decodeJwt(idToken) : {};
+        const userData = {
+          id: idPayload.oid || idPayload.sub || 'microsoft_' + Date.now(),
+          name: idPayload.name || `${idPayload.given_name || ''} ${idPayload.family_name || ''}`.trim() || 'Microsoft User',
+          email: idPayload.email || idPayload.preferred_username || 'user@microsoft.com',
+          accessToken: accessToken || 'no_access_token',
+          provider: 'microsoft',
+          createdAt: new Date().toISOString()
+        };
+        // Cleanup PKCE artifacts after success
+        try {
+          localStorage.removeItem('msal_code_verifier');
+          localStorage.removeItem('msal_client_id');
+          sessionStorage.removeItem('msal_code_verifier');
+          sessionStorage.removeItem('msal_client_id');
+        } catch (_) {}
+        return userData;
+      }
       throw new Error(`Token exchange failed: ${tokenResponse.status} - ${errorText}`);
     }
 
