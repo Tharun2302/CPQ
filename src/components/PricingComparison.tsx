@@ -14,46 +14,6 @@ const PricingComparison: React.FC<PricingComparisonProps> = ({
   onSelectTier,
   configuration
 }) => {
-  const [discount, setDiscount] = useState<number>(0);
-
-  // Read discount from localStorage (set in Configuration session)
-  useEffect(() => {
-    const loadDiscount = () => {
-      try {
-        const savedDiscount = localStorage.getItem('cpq_discount');
-        if (savedDiscount !== null && savedDiscount !== '' && !isNaN(Number(savedDiscount))) {
-          setDiscount(Number(savedDiscount));
-        } else {
-          setDiscount(0);
-        }
-      } catch {
-        setDiscount(0);
-      }
-    };
-
-    // Load initial discount
-    loadDiscount();
-
-    // Listen for storage events (changes from other components)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'cpq_discount') {
-        loadDiscount();
-      }
-    };
-
-    // Listen for custom events (immediate updates from same page)
-    const handleDiscountUpdate = () => {
-      loadDiscount();
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('discountUpdated', handleDiscountUpdate);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('discountUpdated', handleDiscountUpdate);
-    };
-  }, []);
 
   // Business rule: if users > 25,000 show ONLY the Advanced plan
   const enforceAdvancedOnly = (configuration?.numberOfUsers || 0) > 25000;
@@ -66,30 +26,21 @@ const PricingComparison: React.FC<PricingComparisonProps> = ({
     return calc.tier.name === 'Basic' || calc.tier.name === 'Advanced';
   });
 
-  // Helper function to apply discount calculations
-  const calculateDiscountedPrice = (totalCost: number) => {
-    const isDiscountAllowed = totalCost >= 2500;
-    const isDiscountValid = discount > 0 && discount <= 10;
-    const shouldApplyDiscount = isDiscountAllowed && isDiscountValid;
-    
-    if (shouldApplyDiscount) {
-      const discountAmount = totalCost * (discount / 100);
-      const finalTotal = totalCost - discountAmount;
-      return {
-        originalPrice: totalCost,
-        discountAmount,
-        finalPrice: finalTotal >= 2500 ? finalTotal : totalCost, // Don't apply if final would be < $2500
-        hasDiscount: finalTotal >= 2500,
-        discountPercent: discount
-      };
-    }
+  // Helper function to get pricing info from calculation
+  const getPricingInfo = (calc: any) => {
+    // Use the already calculated values from the PricingCalculation
+    const originalPrice = calc.totalCost;
+    const discountAmount = calc.discountAmount || 0;
+    const finalPrice = calc.finalTotal || calc.totalCost;
+    const hasDiscount = discountAmount > 0;
+    const discountPercent = hasDiscount ? ((discountAmount / originalPrice) * 100) : 0;
     
     return {
-      originalPrice: totalCost,
-      discountAmount: 0,
-      finalPrice: totalCost,
-      hasDiscount: false,
-      discountPercent: 0
+      originalPrice,
+      discountAmount,
+      finalPrice,
+      hasDiscount,
+      discountPercent
     };
   };
 
@@ -106,7 +57,7 @@ const PricingComparison: React.FC<PricingComparisonProps> = ({
       
       <div className={`grid grid-cols-1 ${isSingle ? 'md:grid-cols-1 justify-items-center' : 'md:grid-cols-2'} gap-8 max-w-4xl mx-auto`}>
         {filteredCalculations.map((calc) => {
-          const discountInfo = calculateDiscountedPrice(calc.totalCost);
+          const pricingInfo = getPricingInfo(calc);
           
           return (
             <div
@@ -118,16 +69,16 @@ const PricingComparison: React.FC<PricingComparisonProps> = ({
                 <h3 className="text-2xl font-bold mb-3 text-gray-800">
                   {calc.tier.name}
                 </h3>
-                {discountInfo.hasDiscount ? (
+                {pricingInfo.hasDiscount ? (
                   <div>
                     <div className="text-2xl text-gray-500 line-through mb-1">
-                      {formatCurrency(discountInfo.originalPrice)}
+                      {formatCurrency(pricingInfo.originalPrice)}
                     </div>
                     <div className="text-4xl font-bold mb-2 text-green-600">
-                      {formatCurrency(discountInfo.finalPrice)}
+                      {formatCurrency(pricingInfo.finalPrice)}
                     </div>
                     <div className="text-sm text-green-600 font-medium mb-1">
-                      Save {formatCurrency(discountInfo.discountAmount)} ({discountInfo.discountPercent}% off)
+                      Save {formatCurrency(pricingInfo.discountAmount)} ({pricingInfo.discountPercent.toFixed(1)}% off)
                     </div>
                     <div className="text-sm text-gray-600 font-medium">Total project cost</div>
                   </div>
@@ -137,7 +88,7 @@ const PricingComparison: React.FC<PricingComparisonProps> = ({
                       {formatCurrency(calc.totalCost)}
                     </div>
                     <div className="text-sm text-gray-600 font-medium">Total project cost</div>
-                    {discount > 0 && calc.totalCost < 2500 && (
+                    {pricingInfo.originalPrice < 2500 && (
                       <div className="text-xs text-amber-600 mt-1">
                         Discount available for orders above $2,500
                       </div>

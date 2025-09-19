@@ -131,37 +131,85 @@ function App() {
     }
   };
 
-  // Load templates from localStorage on app start
+  // Load templates from database and localStorage on app start
   useEffect(() => {
-    const loadTemplates = () => {
-      const savedTemplates = localStorage.getItem('cpq_templates');
-      if (savedTemplates) {
-        try {
-          const parsedTemplates = JSON.parse(savedTemplates);
-          // Convert base64 strings back to File objects with validation
-          const templatesWithFiles = parsedTemplates.map((template: any) => {
-            const file = template.fileData ? dataURLtoFile(template.fileData, template.fileName) : null;
-            const wordFile = template.wordFileData ? dataURLtoFile(template.wordFileData, template.wordFileName) : null;
-            
-            // Validate template has required data
-            if (!template.id || !template.name) {
-              console.warn('⚠️ Invalid template data:', template);
-              return null;
+    const loadTemplates = async () => {
+      console.log('🔄 App: Loading templates...');
+      try {
+        // Try to load from database first
+        const templateService = (await import('./utils/templateService')).default;
+        const dbTemplates = await templateService.getTemplates();
+        console.log('📋 App: Found templates in database:', dbTemplates.length);
+        
+        if (dbTemplates.length > 0) {
+          // Convert database templates to frontend format
+          const frontendTemplates = await templateService.convertToFrontendTemplates(dbTemplates);
+          console.log('✅ App: Templates loaded from database:', frontendTemplates.length);
+          setTemplates(frontendTemplates);
+        } else {
+          // Fallback to localStorage if no database templates
+          console.log('📋 App: No database templates, checking localStorage...');
+          const savedTemplates = localStorage.getItem('cpq_templates');
+          if (savedTemplates) {
+            try {
+              const parsedTemplates = JSON.parse(savedTemplates);
+              // Convert base64 strings back to File objects with validation
+              const templatesWithFiles = parsedTemplates.map((template: any) => {
+                const file = template.fileData ? dataURLtoFile(template.fileData, template.fileName) : null;
+                const wordFile = template.wordFileData ? dataURLtoFile(template.wordFileData, template.wordFileName) : null;
+                
+                // Validate template has required data
+                if (!template.id || !template.name) {
+                  console.warn('⚠️ Invalid template data:', template);
+                  return null;
+                }
+                
+                return {
+                  ...template,
+                  file,
+                  wordFile,
+                  uploadDate: template.uploadDate ? new Date(template.uploadDate) : new Date(),
+                  content: template.content || null
+                };
+              }).filter((template: any) => template !== null); // Remove invalid templates
+              
+              setTemplates(templatesWithFiles);
+              console.log('✅ App: Loaded templates from localStorage:', templatesWithFiles.length, 'templates');
+            } catch (error) {
+              console.error('❌ Error loading templates from localStorage:', error);
             }
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error loading templates from database:', error);
+        // Fallback to localStorage on error
+        const savedTemplates = localStorage.getItem('cpq_templates');
+        if (savedTemplates) {
+          try {
+            const parsedTemplates = JSON.parse(savedTemplates);
+            const templatesWithFiles = parsedTemplates.map((template: any) => {
+              const file = template.fileData ? dataURLtoFile(template.fileData, template.fileName) : null;
+              const wordFile = template.wordFileData ? dataURLtoFile(template.wordFileData, template.wordFileName) : null;
+              
+              if (!template.id || !template.name) {
+                console.warn('⚠️ Invalid template data:', template);
+                return null;
+              }
+              
+              return {
+                ...template,
+                file,
+                wordFile,
+                uploadDate: template.uploadDate ? new Date(template.uploadDate) : new Date(),
+                content: template.content || null
+              };
+            }).filter((template: any) => template !== null);
             
-            return {
-              ...template,
-              file,
-              wordFile,
-              uploadDate: template.uploadDate ? new Date(template.uploadDate) : new Date(),
-              content: template.content || null
-            };
-          }).filter((template: any) => template !== null); // Remove invalid templates
-          
-          setTemplates(templatesWithFiles);
-          console.log('✅ Loaded templates from localStorage:', templatesWithFiles.length, 'templates');
-        } catch (error) {
-          console.error('❌ Error loading templates from localStorage:', error);
+            setTemplates(templatesWithFiles);
+            console.log('✅ App: Fallback to localStorage:', templatesWithFiles.length, 'templates');
+          } catch (error) {
+            console.error('❌ Error in fallback template loading:', error);
+          }
         }
       }
     };
@@ -1429,13 +1477,6 @@ function App() {
           </div>
         );
 
-      case 'pricing-config':
-        return (
-          <PricingTierConfig
-            tiers={pricingTiers}
-            onTierUpdate={handleTierUpdate}
-          />
-        );
 
 
 
@@ -1461,12 +1502,6 @@ function App() {
                     className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
                   >
                     Go to Configuration
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('pricing')}
-                    className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-semibold"
-                  >
-                    View Pricing
                   </button>
                 </div>
               </div>
