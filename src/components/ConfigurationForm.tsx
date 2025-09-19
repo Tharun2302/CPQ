@@ -364,55 +364,20 @@ const ConfigurationForm: React.FC<ConfigurationFormProps> = ({
                   </div>
                   Combination
                 </label>
-                {templates.length === 0 ? (
-                  <div className="w-full px-6 py-4 border-2 border-purple-200 rounded-xl bg-purple-50 text-purple-700 text-center text-lg font-medium">
-                    Loading templates...
-                  </div>
-                ) : (
-                  <select
-                    value={selectedTemplate?.id || ''}
-                    onChange={(e) => {
-                      const template = templates.find(t => t.id === e.target.value) || null;
-                      if (onTemplateSelect) {
-                        onTemplateSelect(template);
-                      }
-                    // Persist selected template for persistence across sessions
-                    try { localStorage.setItem('cpq_selected_template_id', template ? template.id : ''); } catch {}
-                      
-                      // Auto-scroll to Project Configuration section when template is selected
-                      if (template) {
-                        setTimeout(() => {
-                          const projectConfigSection = document.querySelector('[data-section="project-configuration"]');
-                          if (projectConfigSection) {
-                            projectConfigSection.scrollIntoView({ 
-                              behavior: 'smooth', 
-                              block: 'start' 
-                            });
-                          }
-                        }, 100); // Small delay to ensure DOM is updated
-                      }
-                    }}
-                    className="w-full px-6 py-4 border-2 border-purple-200 rounded-xl focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 bg-white/90 backdrop-blur-sm hover:border-purple-300 text-lg font-medium"
-                  >
-                    <option value="">Select Combination</option>
-                    {templates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.name} {template.isDefault ? '(Default)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                
-                {selectedTemplate && (
-                  <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                    <p className="text-sm text-purple-700">
-                      <strong>Selected:</strong> {selectedTemplate.name}
-                      {selectedTemplate.description && (
-                        <span className="block mt-1 text-purple-600">{selectedTemplate.description}</span>
-                      )}
-                    </p>
-                  </div>
-                )}
+                {/* Restrict to SLACK TO TEAMS only */}
+                <select
+                  value={'slack-to-teams'}
+                  onChange={() => { try { localStorage.setItem('cpq_combination', 'slack-to-teams'); } catch {} }}
+                  className="w-full px-6 py-4 border-2 border-purple-200 rounded-xl focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 bg-white/90 backdrop-blur-sm hover:border-purple-300 text-lg font-medium"
+                >
+                  <option value="slack-to-teams">SLACK TO TEAMS</option>
+                </select>
+                <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                  <p className="text-sm text-purple-700">
+                    <strong>Selected:</strong> SLACK TO TEAMS
+                    <span className="block mt-1 text-purple-600">Templates for this combination will be auto-selected after you choose a plan.</span>
+                  </p>
+                </div>
               </div>
             </div>
           )}

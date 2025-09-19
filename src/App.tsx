@@ -1080,36 +1080,71 @@ function App() {
     const safeTier = (tierName || '').toLowerCase();
     const migration = (config?.migrationType || '').toLowerCase();
 
+    console.log('🔍 Auto-selecting template for:', { tierName: safeTier, migration, availableTemplates: templates.length });
+
+    // First, try exact match for SLACK TO TEAMS templates
+    const exactMatches = templates.filter(t => {
+      const name = (t?.name || '').toLowerCase();
+      
+      // Look for exact pattern: "slack to teams [plan]"
+      const isSlackToTeams = name.includes('slack') && name.includes('teams');
+      const matchesPlan = name.includes(safeTier);
+      
+      return isSlackToTeams && matchesPlan;
+    });
+
+    if (exactMatches.length > 0) {
+      console.log('✅ Found exact template match:', exactMatches[0].name);
+      return exactMatches[0];
+    }
+
+    // Fallback to scoring system for other cases
     const scoreTemplate = (t: any): number => {
       const name = (t?.name || '').toLowerCase();
       const desc = (t?.description || '').toLowerCase();
       let score = 0;
-      // Strong matches on tier keywords
-      if (safeTier && (name.includes(safeTier) || desc.includes(safeTier))) score += 5;
-      if (safeTier.includes('basic') && (name.includes('basic') || desc.includes('basic'))) score += 4;
-      if (safeTier.includes('advanced') && (name.includes('advanced') || desc.includes('advanced'))) score += 4;
+      
+      // Exact plan type match gets highest priority
+      if (safeTier === 'basic' && name.includes('basic')) score += 10;
+      if (safeTier === 'advanced' && name.includes('advanced')) score += 10;
+      
+      // SLACK TO TEAMS combination gets high priority
+      if (name.includes('slack') && name.includes('teams')) score += 8;
+      
       // Migration type match
-      if (migration && (name.includes(migration) || desc.includes(migration))) score += 3;
-      // Common messaging combos (Slack → Teams etc.)
-      if ((name.includes('slack') && name.includes('teams')) || (desc.includes('slack') && desc.includes('teams'))) score += 2;
-      // Prefer DOCX based templates if available
+      if (migration && (name.includes(migration) || desc.includes(migration))) score += 5;
+      
+      // General tier keywords
+      if (safeTier && (name.includes(safeTier) || desc.includes(safeTier))) score += 3;
+      
+      // Prefer DOCX templates
       const fileType = t?.wordFile?.type || t?.file?.type || '';
-      if (typeof fileType === 'string' && fileType.includes('wordprocessingml')) score += 1;
-      // Default flag
+      if (typeof fileType === 'string' && fileType.includes('wordprocessingml')) score += 2;
+      
+      // Default flag bonus
       if (t?.isDefault) score += 1;
+      
       return score;
     };
 
-    // Compute best template
+    // Find best template using scoring
     let best: any | null = null;
     let bestScore = -1;
     for (const t of templates) {
       const s = scoreTemplate(t);
+      console.log(`📊 Template "${t.name}" scored: ${s}`);
       if (s > bestScore) {
         best = t;
         bestScore = s;
       }
     }
+
+    if (best) {
+      console.log('✅ Auto-selected template via scoring:', { name: best.name, score: bestScore });
+    } else {
+      console.log('❌ No suitable template found for auto-selection');
+    }
+
     return best;
   };
 

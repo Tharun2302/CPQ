@@ -66,6 +66,14 @@ async function initializeDatabase() {
     
     // Test the connection
     await db.admin().ping();
+    
+    // Auto-seed default templates on server startup
+    try {
+      const { seedDefaultTemplates } = require('./seed-templates.cjs');
+      await seedDefaultTemplates(db);
+    } catch (error) {
+      console.log('⚠️ Template seeding skipped:', error.message);
+    }
     console.log('✅ MongoDB Atlas ping successful');
     
     // Create users collection with proper indexes
@@ -1016,18 +1024,36 @@ app.get('/api/templates/:id/file', async (req, res) => {
         });
       }
 
-    // Determine content type based on file type
-    const contentType = template.fileType === 'docx' 
-      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      : 'application/pdf';
+    // Determine content type based on stored fileType (supports both short type and full MIME)
+    let contentType = 'application/octet-stream';
+    const ft = (template.fileType || '').toString().toLowerCase();
+    if (ft === 'docx' || ft.includes('wordprocessingml')) {
+      contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    } else if (ft === 'pdf' || ft.includes('application/pdf')) {
+      contentType = 'application/pdf';
+    }
+    
+    // Normalize fileData to Buffer (support Buffer, BSON Binary, or base64 string)
+    let fileBuffer;
+    if (Buffer.isBuffer(template.fileData)) {
+      fileBuffer = template.fileData;
+    } else if (template.fileData && template.fileData.buffer) {
+      // Some drivers store Binary with .buffer
+      fileBuffer = Buffer.from(template.fileData.buffer);
+    } else if (typeof template.fileData === 'string') {
+      // Base64 string
+      fileBuffer = Buffer.from(template.fileData, 'base64');
+    } else {
+      throw new Error('Unsupported template fileData format');
+    }
     
     res.set({
       'Content-Type': contentType,
       'Content-Disposition': `attachment; filename="${template.fileName}"`,
-      'Content-Length': template.fileSize
+      'Content-Length': fileBuffer.length
     });
     
-    res.send(template.fileData);
+    res.send(fileBuffer);
   } catch (error) {
     console.error('❌ Error fetching template file:', error);
     res.status(500).json({ 
